@@ -1,6 +1,8 @@
 # AllHail: notes for AI agents (Codex, Claude, Gemini)
 
-This repo is being rebuilt from a Streamlit app (`app.py`, `simple_2.py` and friends) into **AllHail**, an installable web app (PWA) that turns photos, documents and typed text into speech for blind and low-vision students and their teachers. It joins OverBoard, AllAboard and OverHeard.
+**AllHail** is an installable web app (PWA) that turns photos, documents and typed text into speech for blind and low-vision students and their teachers. It joins OverBoard, AllAboard and OverHeard. It started as [`BPMData/tts_st`](https://github.com/BPMData/tts_st), a Streamlit app; that repo is archived, its history and earlier pull requests stay there, and the last Streamlit version is its `streamlit-final` tag.
+
+**This repo is edited by Google AI Studio, Codex and Claude.** AI Studio doesn't keep `package-lock.json` here, so CI installs with `npm install`, not `npm ci`. Don't re-add the lock file or switch CI back.
 
 **Read [`PLAN.md`](PLAN.md) first.** It holds every decision made so far: who the app is for, the speech fallback chain, the vision model chains for each button, the prompt tests and the build order. The **step 2** foundation is in place; start new feature work with **step 3** (Student mode). See [`README.md`](README.md) for local setup and checks. Real-device installation checks from step 2 still need a human.
 
