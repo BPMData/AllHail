@@ -8,11 +8,13 @@ const pwa = vi.hoisted(() => ({
   needRefresh: false,
   updateServiceWorker: vi.fn().mockResolvedValue(undefined),
   onRegisterError: undefined as undefined | (() => void),
+  onNeedReload: undefined as undefined | (() => void),
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: (options: { onRegisterError: () => void }) => {
+  useRegisterSW: (options: { onRegisterError: () => void; onNeedReload?: () => void }) => {
     pwa.onRegisterError = options.onRegisterError;
+    pwa.onNeedReload = options.onNeedReload;
     return {
       offlineReady: [pwa.offlineReady],
       needRefresh: [pwa.needRefresh],
@@ -72,11 +74,20 @@ describe('app accessibility and offline feedback', () => {
     expect(screen.getByRole('status').textContent).toContain(strings.offlineReady);
   });
 
-  it('waits for the user before applying an update', () => {
+  it('waits for the user before applying an update', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
     pwa.needRefresh = true;
     render(<App />);
+    act(() => pwa.onNeedReload?.());
+    expect(reload).not.toHaveBeenCalled();
     expect(pwa.updateServiceWorker).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: strings.update }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.update }));
+    });
     expect(pwa.updateServiceWorker).toHaveBeenCalledWith(true);
+    act(() => pwa.onNeedReload?.());
+    expect(reload).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 });

@@ -1,15 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { strings } from '../shared/strings.ts';
 
 export function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [cacheError, setCacheError] = useState(false);
+  const userRequestedUpdate = useRef(false);
+  const reloading = useRef(false);
+
+  const reloadOnce = () => {
+    if (!reloading.current) {
+      reloading.current = true;
+      window.location.reload();
+    }
+  };
+
   const {
     offlineReady: [offlineReady],
     needRefresh: [needRefresh],
     updateServiceWorker,
-  } = useRegisterSW({ onRegisterError: () => setCacheError(true) });
+  } = useRegisterSW({
+    onRegisterError: () => setCacheError(true),
+    onNeedReload: () => {
+      if (userRequestedUpdate.current) {
+        reloadOnce();
+      }
+    },
+  });
 
   useEffect(() => {
     const updateConnection = () => setOnline(navigator.onLine);
@@ -20,6 +37,32 @@ export function App() {
       window.removeEventListener('offline', updateConnection);
     };
   }, []);
+
+  const handleUpdate = async () => {
+    userRequestedUpdate.current = true;
+    const hasServiceWorker = typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
+    if (hasServiceWorker) {
+      navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
+    }
+    try {
+      await updateServiceWorker(true);
+      if (hasServiceWorker) {
+        const reg = await navigator.serviceWorker.getRegistration('/');
+        if (reg?.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+          navigator.serviceWorker.removeEventListener('controllerchange', reloadOnce);
+          reloadOnce();
+        }
+      }
+    } catch {
+      userRequestedUpdate.current = false;
+      if (hasServiceWorker) {
+        navigator.serviceWorker.removeEventListener('controllerchange', reloadOnce);
+      }
+      setCacheError(true);
+    }
+  };
 
   return (
     <>
@@ -44,7 +87,7 @@ export function App() {
             {needRefresh && <p className="mt-2">{strings.updateReady}</p>}
           </div>
           {needRefresh && (
-            <button type="button" className="update-button mb-8 rounded-xl px-6 py-3 font-bold" onClick={() => void updateServiceWorker(true).catch(() => setCacheError(true))}>
+            <button type="button" className="update-button mb-8 rounded-xl px-6 py-3 font-bold" onClick={() => void handleUpdate()}>
               {strings.update}
             </button>
           )}
