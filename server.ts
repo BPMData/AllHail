@@ -1,8 +1,10 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createDescribeHandler, type DescribeDeps } from './server/describe.ts';
+import { strings } from './shared/strings.ts';
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -18,10 +20,25 @@ export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
   return Boolean(env.K_SERVICE);
 }
 
-export async function createApp({ production = isProduction() } = {}) {
+export async function createApp({
+  production = isProduction(),
+  describeDeps,
+}: {
+  production?: boolean;
+  describeDeps?: DescribeDeps;
+} = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+  app.post('/api/describe', express.json({ limit: '6mb' }), createDescribeHandler(describeDeps));
+  // Ensure malformed JSON or oversized bodies on /api return JSON instead of HTML.
+  app.use('/api', (err: { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
+    if (err.type === 'entity.too.large' || err.status === 413) {
+      return res.status(413).json({ error: 'image_too_large', message: strings.errImageTooLarge });
+    }
+    return res.status(400).json({ error: 'invalid_request', message: strings.errInvalidRequest });
+  });
   // Unknown API routes must never return the app HTML (or be cached offline).
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 

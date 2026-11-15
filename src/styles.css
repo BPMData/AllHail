@@ -10,18 +10,150 @@
   color-scheme: light dark;
 }
 
-body { min-width: 280px; margin: 0; }
-button, summary { min-height: 48px; }
-button { cursor: pointer; }
-:focus-visible { outline: 4px solid #a54a00; outline-offset: 5px; }
-.status-panel { background: #e6eee5; border-color: #557361; }
-.update-button { color: #fff; background: #153f35; }
-.skip-link { position: fixed; top: 12px; left: 12px; padding: 12px; background: #fff; color: #153f35; z-index: 1; transform: translateY(-200%); }
-.skip-link:focus { transform: translateY(0); }
+body {
+  min-width: 280px;
+  margin: 0;
+}
+
+button,
+summary,
+select {
+  min-height: 48px;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 4px solid #a54a00;
+  outline-offset: 5px;
+}
+
+.status-panel {
+  background: #e6eee5;
+  border-color: #557361;
+}
+
+.panel-card {
+  background: #ffffff;
+  border-color: #557361;
+}
+
+.reader-surface {
+  background: #f7f8f2;
+  border-color: #557361;
+  color: #153f35;
+}
+
+.primary-cta,
+.update-button {
+  color: #ffffff;
+  background: #153f35;
+}
+
+.secondary-cta {
+  color: #153f35;
+  background: #dfeee2;
+  border-color: #153f35;
+}
+
+.surface-button {
+  color: #153f35;
+  background: #ffffff;
+  border-color: #557361;
+}
+
+.nav-bar {
+  background: rgba(247, 248, 242, 0.96);
+  border-color: #557361;
+}
+
+.nav-tab-active {
+  color: #ffffff;
+  background: #153f35;
+}
+
+.nav-tab-idle {
+  color: #153f35;
+  background: transparent;
+}
+
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  padding: 12px;
+  background: #ffffff;
+  color: #153f35;
+  z-index: 50;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
 
 @media (prefers-color-scheme: dark) {
-  :root { color: #eef5ed; background: #12221e; }
-  :focus-visible { outline-color: #ffca81; }
-  .status-panel { background: #203c32; border-color: #9bc2ab; }
-  .update-button { background: #c6e4cb; color: #12221e; }
+  :root {
+    color: #eef5ed;
+    background: #12221e;
+  }
+
+  :focus-visible {
+    outline-color: #ffca81;
+  }
+
+  .status-panel {
+    background: #203c32;
+    border-color: #9bc2ab;
+  }
+
+  .panel-card {
+    background: #172d27;
+    border-color: #9bc2ab;
+  }
+
+  .reader-surface {
+    background: #12221e;
+    border-color: #9bc2ab;
+    color: #eef5ed;
+  }
+
+  .primary-cta,
+  .update-button {
+    background: #c6e4cb;
+    color: #12221e;
+  }
+
+  .secondary-cta {
+    background: #224438;
+    color: #eef5ed;
+    border-color: #c6e4cb;
+  }
+
+  .surface-button {
+    background: #1c352e;
+    color: #eef5ed;
+    border-color: #9bc2ab;
+  }
+
+  .nav-bar {
+    background: rgba(18, 34, 30, 0.96);
+    border-color: #9bc2ab;
+  }
+
+  .nav-tab-active {
+    background: #c6e4cb;
+    color: #12221e;
+  }
+
+  .nav-tab-idle {
+    color: #eef5ed;
+  }
+
+  .skip-link {
+    background: #172d27;
+    color: #eef5ed;
+  }
 }

@@ -5,7 +5,7 @@ test('meets Chrome install checks and reopens offline without caching API replie
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: strings.welcome })).toBeVisible();
+  await expect(page.getByRole('heading', { name: strings.studentHeading })).toBeVisible();
   await expect(page.getByRole('status')).toContainText(strings.offlineReady);
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -33,12 +33,12 @@ test('meets Chrome install checks and reopens offline without caching API replie
   await context.setOffline(true);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
   await page.reload();
-  await expect(page.getByRole('heading', { name: strings.welcome })).toBeVisible();
+  await expect(page.getByRole('heading', { name: strings.studentHeading })).toBeVisible();
   await expect(page.getByRole('status')).toContainText(strings.offline);
   // A new tab exercises reopening the installed app's start URL, not just a warm tab.
   const reopened = await context.newPage();
   await reopened.goto('/');
-  await expect(reopened.getByRole('heading', { name: strings.welcome })).toBeVisible();
+  await expect(reopened.getByRole('heading', { name: strings.studentHeading })).toBeVisible();
   await expect(reopened.getByRole('status')).toContainText(strings.offline);
   const apiWorksOffline = await reopened.evaluate(async () => {
     try { await fetch('/api/health'); return true; } catch { return false; }

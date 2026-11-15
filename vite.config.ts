@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { strings } from './shared/strings.ts';
 
 export default defineConfig({
+  worker: {
+    format: 'es',
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
@@ -48,6 +51,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],

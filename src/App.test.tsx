@@ -1,7 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { strings } from '../shared/strings.ts';
 import { App } from './App.tsx';
+import * as imagePrep from './imagePrep.ts';
+import { KokoroBrowserClient } from './speech/kokoroClient.ts';
+import { SpeechCoordinator, type VoiceProvider } from './speech/speechCoordinator.ts';
 
 const pwa = vi.hoisted(() => ({
   offlineReady: false,
@@ -23,27 +26,91 @@ vi.mock('virtual:pwa-register/react', () => ({
   },
 }));
 
+function makeTestRuntime() {
+  const spokenTexts: string[] = [];
+  const cueTexts: string[] = [];
+  const unlockAudioContext = vi.fn();
+
+  const deviceProvider: VoiceProvider = {
+    id: 'device',
+    isReady: () => true,
+    speak: (text, callbacks) => {
+      spokenTexts.push(text);
+      callbacks.onStart?.('device');
+      return { pause: vi.fn(), resume: vi.fn(), stop: vi.fn() };
+    },
+  };
+  const kokoroProvider: VoiceProvider = {
+    id: 'kokoro',
+    isReady: () => false,
+    speak: () => ({ pause: vi.fn(), resume: vi.fn(), stop: vi.fn() }),
+  };
+
+  const kokoroClient = new KokoroBrowserClient();
+  const startDownloadSpy = vi.spyOn(kokoroClient, 'startDownload').mockImplementation(() => undefined);
+
+  const coordinator = new SpeechCoordinator({
+    deviceProvider,
+    kokoroProvider,
+    unlockAudioContext,
+    unlockDeviceCue: (cue) => cueTexts.push(cue),
+  });
+
+  return {
+    spokenTexts,
+    cueTexts,
+    unlockAudioContext,
+    startDownloadSpy,
+    kokoroClient,
+    coordinator,
+  };
+}
+
 beforeEach(() => {
+  localStorage.clear();
   pwa.offlineReady = false;
   pwa.needRefresh = false;
   pwa.updateServiceWorker.mockClear();
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 });
-afterEach(cleanup);
 
-describe('app accessibility and offline feedback', () => {
-  it('offers a skip link to the main content and installation instructions', () => {
-    render(<App />);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe('app accessibility, PWA feedback, and student mode', () => {
+  it('opens directly into Student camera mode with skip link and install guide in Info', () => {
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
+
     const main = screen.getByRole('main');
     expect(screen.getByRole('link', { name: strings.skipLink }).getAttribute('href')).toBe(`#${main.id}`);
     expect(main.tabIndex).toBe(-1);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(strings.welcome);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(strings.studentHeading);
+
+    // Native camera inputs are wired for both Quick look and Full detail
+    const quickInput = screen.getByTestId('camera-input-describe') as HTMLInputElement;
+    const detailInput = screen.getByTestId('camera-input-detail') as HTMLInputElement;
+    expect(quickInput.getAttribute('accept')).toBe('image/*');
+    expect(quickInput.getAttribute('capture')).toBe('environment');
+    expect(detailInput.getAttribute('accept')).toBe('image/*');
+    expect(detailInput.getAttribute('capture')).toBe('environment');
+
+    // Gallery Choose photo does not force camera capture
+    const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
+    expect(galleryInput.getAttribute('accept')).toBe('image/*');
+    expect(galleryInput.getAttribute('capture')).toBeNull();
+
+    // Navigate to Settings & Info tab to read install guide
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
     fireEvent.click(screen.getByText(strings.installTitle));
     expect(screen.getByText(strings.installChrome)).toBeDefined();
   });
 
   it('announces loss and return of a connection without reloading', () => {
-    render(<App />);
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
     const status = screen.getByRole('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
     expect(status.textContent).toContain(strings.online);
@@ -57,12 +124,14 @@ describe('app accessibility and offline feedback', () => {
 
   it('starts with an offline message when opened without a connection', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    render(<App />);
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
     expect(screen.getByRole('status').textContent).toContain(strings.offline);
   });
 
   it('reports a failed registration without claiming offline readiness', () => {
-    render(<App />);
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
     act(() => pwa.onRegisterError?.());
     expect(screen.getByRole('status').textContent).toContain(strings.offlineError);
     expect(screen.queryByText(strings.offlineReady)).toBeNull();
@@ -70,7 +139,8 @@ describe('app accessibility and offline feedback', () => {
 
   it('announces when the app is saved for offline use', () => {
     pwa.offlineReady = true;
-    render(<App />);
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
     expect(screen.getByRole('status').textContent).toContain(strings.offlineReady);
   });
 
@@ -78,16 +148,134 @@ describe('app accessibility and offline feedback', () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload });
     pwa.needRefresh = true;
-    render(<App />);
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
     act(() => pwa.onNeedReload?.());
     expect(reload).not.toHaveBeenCalled();
     expect(pwa.updateServiceWorker).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: strings.update }));
+      fireEvent.click(screen.getAllByRole('button', { name: strings.update })[0]);
     });
     expect(pwa.updateServiceWorker).toHaveBeenCalledWith(true);
     act(() => pwa.onNeedReload?.());
     expect(reload).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+
+  it('unlocks iOS audio on shutter tap, keeps description out of aria-live, and respects autoRead setting', async () => {
+    const { coordinator, kokoroClient, cueTexts, spokenTexts, unlockAudioContext } = makeTestRuntime();
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: 'A watercolor bridge over 3/4 of a calm river.',
+          model: 'anthropic/claude-haiku-5.5',
+          mode: 'describe',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
+
+    const quickBtn = screen.getByRole('button', { name: new RegExp(strings.quickLook) });
+    fireEvent.click(quickBtn);
+
+    // Synchronous iOS audio unlock happened during tap
+    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+    expect(cueTexts).toEqual([strings.statusShortCue]);
+
+    const cameraInput = screen.getByTestId('camera-input-describe') as HTMLInputElement;
+    const fakeFile = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
+    await act(async () => {
+      fireEvent.change(cameraInput, { target: { files: [fakeFile] } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('A watercolor bridge over 3/4 of a calm river.')).toBeDefined();
+    });
+
+    // No double speech: aria-live region only says short status, never description body
+    const liveStatus = screen.getByRole('status');
+    expect(liveStatus.textContent).toContain(strings.statusReady);
+    expect(liveStatus.textContent).not.toContain('watercolor bridge');
+
+    // Auto-read spoke the cleaned copy ("three quarters")
+    expect(spokenTexts).toEqual(['A watercolor bridge over three quarters of a calm river.']);
+
+    // Turn off "Read descriptions aloud automatically" in Settings & Info
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    const autoReadToggle = screen.getByLabelText(new RegExp(strings.autoReadLabel)) as HTMLInputElement;
+    expect(autoReadToggle.checked).toBe(true);
+    fireEvent.click(autoReadToggle);
+    expect(autoReadToggle.checked).toBe(false);
+
+    // Return to Camera and run Full detail on the same photo -> does NOT auto-speak or cue
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
+    const sameFullDetail = screen.getByRole('button', { name: strings.fullDetailSamePhoto });
+    await act(async () => {
+      fireEvent.click(sameFullDetail);
+    });
+
+    expect(spokenTexts).toHaveLength(1);
+    expect(cueTexts).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not download Kokoro automatically on phones until user opts in, while laptops auto-prepare', () => {
+    const phoneRuntime = makeTestRuntime();
+    render(
+      <App
+        coordinator={phoneRuntime.coordinator}
+        kokoroClient={phoneRuntime.kokoroClient}
+        deviceClassOverride="phone"
+      />,
+    );
+    expect(phoneRuntime.startDownloadSpy).not.toHaveBeenCalled();
+
+    // Open Settings & Info on phone and check ~90 MB opt-in notice
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    expect(screen.getByTestId('kokoro-status').textContent).toBe(strings.kokoroStatusOff);
+    const optIn = screen.getByLabelText(strings.kokoroEnablePhoneLabel);
+    fireEvent.click(optIn);
+    expect(phoneRuntime.startDownloadSpy).toHaveBeenCalledTimes(1);
+
+    cleanup();
+
+    const laptopRuntime = makeTestRuntime();
+    render(
+      <App
+        coordinator={laptopRuntime.coordinator}
+        kokoroClient={laptopRuntime.kokoroClient}
+        deviceClassOverride="laptop"
+      />,
+    );
+    expect(laptopRuntime.startDownloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a clear fallback message if optional live viewfinder camera access is denied', async () => {
+    const { coordinator, kokoroClient } = makeTestRuntime();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError')),
+      },
+    });
+
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="phone" />);
+    const toggleBtn = screen.getByRole('button', { name: strings.liveViewfinderShow });
+    await act(async () => {
+      fireEvent.click(toggleBtn);
+    });
+
+    expect(screen.getByRole('status').textContent).toContain(strings.liveViewfinderDenied);
   });
 });
