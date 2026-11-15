@@ -17,3 +17,6 @@ tools/vision-bakeoff/results/
 
 # Owner's real test photos: personal, never committed
 sample_images/
+
+# AI Studio does not keep a lock file here; CI installs from package.json (see .github/workflows/ci.yml)
+package-lock.json
