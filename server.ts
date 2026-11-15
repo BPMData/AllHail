@@ -53,10 +53,20 @@ export async function createApp({ production = isProduction() } = {}) {
   return app;
 }
 
+function readCliFlag(args: string[], flag: string): string | undefined {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === flag && args[i + 1] && !args[i + 1].startsWith('--')) return args[i + 1];
+    if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
+  }
+  return undefined;
+}
+
 // Importing for checks/tests does not open a port. Production needs no TS loader.
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const args = process.argv.slice(2);
   const app = await createApp();
-  const port = Number(process.env.PORT || 3000);
-  const host = process.env.HOST || '0.0.0.0';
+  const port = Number(readCliFlag(args, '--port') || process.env.PORT || 3000);
+  const host = readCliFlag(args, '--host') || process.env.HOST || '0.0.0.0';
   app.listen(port, host, () => console.log(`AllHail is listening on http://${host}:${port}`));
 }
