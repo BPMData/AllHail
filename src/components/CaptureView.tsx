@@ -10,6 +10,7 @@ export type DescriptionResult = {
   mode: PromptMode;
   model: string;
   text: string;
+  sourceName?: string;
   thumbnailDataUrl?: string;
   createdAt: number;
 };
@@ -17,6 +18,8 @@ export type DescriptionResult = {
 type CaptureViewProps = {
   online: boolean;
   busy: boolean;
+  mp3Busy?: boolean;
+  mp3ProgressLabel?: string | null;
   preparedPhoto: PreparedPhoto | null;
   currentResult: DescriptionResult | null;
   speechStatus: SpeechStatusSnapshot;
@@ -24,8 +27,9 @@ type CaptureViewProps = {
   settings: AppSettings;
   onUnlockCapture: () => void;
   onUnlockPlayback: () => void;
-  onPreparedPhoto: (photo: PreparedPhoto) => void;
-  onDescribePrepared: (photo: PreparedPhoto, mode: PromptMode) => Promise<void>;
+  onPreparedPhoto: (photo: PreparedPhoto, sourceName?: string) => void;
+  onDescribePrepared: (photo: PreparedPhoto, mode: PromptMode, sourceName?: string) => Promise<void>;
+  onDownloadMp3?: (result: DescriptionResult) => void;
   onStatusAnnouncement: (message: string) => void;
   onTogglePause: () => void;
   onPlayResult: (text: string) => void;
@@ -37,6 +41,8 @@ type CaptureViewProps = {
 export function CaptureView({
   online,
   busy,
+  mp3Busy = false,
+  mp3ProgressLabel = null,
   preparedPhoto,
   currentResult,
   speechStatus,
@@ -46,6 +52,7 @@ export function CaptureView({
   onUnlockPlayback,
   onPreparedPhoto,
   onDescribePrepared,
+  onDownloadMp3,
   onStatusAnnouncement,
   onTogglePause,
   onPlayResult,
@@ -62,6 +69,7 @@ export function CaptureView({
   const [viewfinderOpen, setViewfinderOpen] = useState(false);
   const [viewfinderReady, setViewfinderReady] = useState(false);
   const [viewfinderMessage, setViewfinderMessage] = useState<string | null>(null);
+  const [selectedMode, setSelectedMode] = useState<PromptMode>('describe');
 
   useEffect(() => {
     return () => {
@@ -123,6 +131,7 @@ export function CaptureView({
   };
 
   const handlePrimaryShutter = async (mode: PromptMode) => {
+    setSelectedMode(mode);
     if (busy) return;
     onUnlockCapture();
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -158,9 +167,9 @@ export function CaptureView({
     onStatusAnnouncement(strings.statusPreparing);
     try {
       const prepared = await preparePhotoBlob(file);
-      onPreparedPhoto(prepared);
+      onPreparedPhoto(prepared, file.name);
       if (autoDescribeMode) {
-        await onDescribePrepared(prepared, autoDescribeMode);
+        await onDescribePrepared(prepared, autoDescribeMode, file.name);
       } else {
         onStatusAnnouncement(strings.photoLoadedStatus);
       }
@@ -170,6 +179,7 @@ export function CaptureView({
   };
 
   const handleSamePhotoDescribe = async (mode: PromptMode) => {
+    setSelectedMode(mode);
     if (!preparedPhoto || busy) return;
     onUnlockCapture();
     if (!online) {
@@ -177,6 +187,15 @@ export function CaptureView({
       return;
     }
     await onDescribePrepared(preparedPhoto, mode);
+  };
+
+  const handleChoosePhotoClick = () => {
+    if (busy) return;
+    onUnlockCapture();
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = '';
+      galleryInputRef.current.click();
+    }
   };
 
   const handleReaderCardClick = () => {
@@ -235,7 +254,7 @@ export function CaptureView({
         tabIndex={-1}
         aria-hidden="true"
         data-testid="gallery-input"
-        onChange={(e) => void handleFilePicked(e.target.files?.[0], null)}
+        onChange={(e) => void handleFilePicked(e.target.files?.[0], selectedMode)}
       />
 
       {/* Left column on desktop / Primary capture controls */}
@@ -272,17 +291,48 @@ export function CaptureView({
           </button>
         </div>
 
+        {/* Pre-selected mode for uploaded photos */}
+        <fieldset className="panel-card rounded-2xl border-2 p-3">
+          <legend className="px-1 text-sm font-bold">{strings.choosePhotoModeLabel}</legend>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            {(
+              [
+                { value: 'describe', label: strings.modeQuickLookLabel },
+                { value: 'detail', label: strings.modeFullDetailLabel },
+              ] as const
+            ).map((option) => {
+              const checked = selectedMode === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={
+                    checked
+                      ? 'nav-tab-active flex min-h-[48px] cursor-pointer items-center justify-center rounded-xl px-3 py-2 text-center text-sm font-bold focus-within:outline focus-within:outline-4 focus-within:outline-offset-2'
+                      : 'surface-button flex min-h-[48px] cursor-pointer items-center justify-center rounded-xl border-2 px-3 py-2 text-center text-sm font-bold focus-within:outline focus-within:outline-4 focus-within:outline-offset-2'
+                  }
+                >
+                  <input
+                    type="radio"
+                    name="choose-photo-mode"
+                    value={option.value}
+                    checked={checked}
+                    disabled={busy}
+                    onChange={() => setSelectedMode(option.value)}
+                    className="sr-only"
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
         {/* Existing photo picker + optional live viewfinder toggle */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              if (galleryInputRef.current) {
-                galleryInputRef.current.value = '';
-                galleryInputRef.current.click();
-              }
-            }}
+            onClick={handleChoosePhotoClick}
             className="surface-button flex min-h-[52px] items-center justify-center rounded-xl border-2 px-4 py-3 text-base font-bold disabled:opacity-60"
           >
             {strings.choosePhoto}
@@ -416,6 +466,19 @@ export function CaptureView({
                     className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
                   >
                     {strings.stopSpeech}
+                  </button>
+                )}
+
+                {onDownloadMp3 && (
+                  <button
+                    type="button"
+                    disabled={mp3Busy}
+                    aria-busy={mp3Busy}
+                    data-testid="download-mp3-button"
+                    onClick={() => onDownloadMp3(currentResult)}
+                    className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold disabled:opacity-60"
+                  >
+                    {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
                   </button>
                 )}
               </div>

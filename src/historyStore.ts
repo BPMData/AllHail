@@ -6,6 +6,7 @@ export type HistoryEntry = {
   mode: PromptMode;
   model: string;
   text: string;
+  sourceName?: string;
   thumbnailDataUrl?: string;
 };
 

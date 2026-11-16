@@ -1,3 +1,4 @@
+import { splitTextForSpeech } from '../../shared/speechChunks.ts';
 import {
   isAudibleAudioBuffer,
   SharedAudioContextManager,
@@ -317,6 +318,38 @@ export class PiperBrowserClient {
         this.pendingChunks.delete(key);
         pending.reject(new Error('Job cancelled'));
       }
+    }
+  }
+
+  async synthesizeToWavChunks(
+    cleanedText: string,
+    options: {
+      onProgress?: (done: number, total: number) => void;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<ArrayBuffer[]> {
+    const chunksText = splitTextForSpeech(cleanedText);
+    if (chunksText.length === 0) return [];
+
+    const jobId = this.nextJobId++;
+    this.activeJobs += 1;
+    const onAbort = () => this.cancelWorkerJob(jobId);
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      const results: ArrayBuffer[] = [];
+      for (let i = 0; i < chunksText.length; i += 1) {
+        if (options.signal?.aborted) {
+          throw new Error('MP3 synthesis cancelled');
+        }
+        const wavBuffer = await this.requestChunk(jobId, i, chunksText[i]);
+        results.push(wavBuffer);
+        options.onProgress?.(i + 1, chunksText.length);
+      }
+      return results;
+    } finally {
+      options.signal?.removeEventListener('abort', onAbort);
+      this.activeJobs = Math.max(0, this.activeJobs - 1);
     }
   }
 

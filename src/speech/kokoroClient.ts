@@ -1,3 +1,4 @@
+import { splitTextForSpeech } from '../../shared/speechChunks.ts';
 import {
   isAudibleWaveform,
   SharedAudioContextManager,
@@ -270,6 +271,43 @@ export class KokoroBrowserClient {
         this.pendingChunks.delete(key);
         pending.reject(new Error('Job cancelled'));
       }
+    }
+  }
+
+  async synthesizeToChunks(
+    cleanedText: string,
+    options: {
+      voice: string;
+      rate: number;
+      onProgress?: (done: number, total: number) => void;
+      signal?: AbortSignal;
+    },
+  ): Promise<Array<{ samples: Float32Array; sampleRate: number }>> {
+    const chunksText = splitTextForSpeech(cleanedText);
+    if (chunksText.length === 0) return [];
+
+    const jobId = this.nextJobId++;
+    this.activeJobs += 1;
+    const onAbort = () => this.cancelWorkerJob(jobId);
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+
+    try {
+      const results: Array<{ samples: Float32Array; sampleRate: number }> = [];
+      for (let i = 0; i < chunksText.length; i += 1) {
+        if (options.signal?.aborted) {
+          throw new Error('MP3 synthesis cancelled');
+        }
+        const chunk = await this.requestChunk(jobId, i, chunksText[i], options.voice, options.rate);
+        if (!isAudibleWaveform(chunk.samples)) {
+          throw new Error('Kokoro returned silent or invalid audio');
+        }
+        results.push(chunk);
+        options.onProgress?.(i + 1, chunksText.length);
+      }
+      return results;
+    } finally {
+      options.signal?.removeEventListener('abort', onAbort);
+      this.activeJobs = Math.max(0, this.activeJobs - 1);
     }
   }
 

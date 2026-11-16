@@ -2,10 +2,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { strings } from '../shared/strings.ts';
 import { App } from './App.tsx';
+import * as historyStore from './historyStore.ts';
 import * as imagePrep from './imagePrep.ts';
 import { KokoroBrowserClient } from './speech/kokoroClient.ts';
 import { PIPER_TOTAL_SIZE_MB } from './speech/piperAssets.ts';
 import { PiperBrowserClient } from './speech/piperClient.ts';
+import { buildTestWavArrayBuffer } from './speech/piperLoader.test.ts';
 import { SpeechCoordinator, type VoiceProvider } from './speech/speechCoordinator.ts';
 
 const pwa = vi.hoisted(() => ({
@@ -576,5 +578,240 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     });
 
     expect(screen.getByRole('status').textContent).toContain(strings.liveViewfinderDenied);
+  });
+
+  it('automatically runs the pre-selected Quick look or Full detail mode when uploading via Choose photo', async () => {
+    const { coordinator, kokoroClient, piperClient, spokenTexts, unlockAudioContext } = makeTestRuntime();
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { mode: string };
+      return new Response(
+        JSON.stringify({
+          text: body.mode === 'detail' ? 'Full painted details.' : 'Quick painting overview.',
+          model: 'anthropic/claude-haiku-5.5',
+          mode: body.mode,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <App
+        coordinator={coordinator}
+        kokoroClient={kokoroClient}
+        piperClient={piperClient}
+        deviceClassOverride="laptop"
+      />,
+    );
+
+    // Default pre-selected mode is Quick look -> uploading via Choose photo runs describe immediately
+    fireEvent.click(screen.getByRole('button', { name: strings.choosePhoto }));
+    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+
+    const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(galleryInput, {
+        target: { files: [new File(['photo1'], 'painting1.jpg', { type: 'image/jpeg' })] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Quick painting overview.')).toBeDefined();
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).mode).toBe('describe');
+    expect(spokenTexts).toEqual(['Quick painting overview.']);
+
+    // Pre-selecting Full detail runs Full detail automatically on the next uploaded photo
+    fireEvent.click(screen.getByRole('radio', { name: strings.modeFullDetailLabel }));
+    await act(async () => {
+      fireEvent.change(galleryInput, {
+        target: { files: [new File(['photo2'], 'painting2.jpg', { type: 'image/jpeg' })] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Full painted details.')).toBeDefined();
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).mode).toBe('detail');
+    expect(spokenTexts).toEqual(['Quick painting overview.', 'Full painted details.']);
+    vi.unstubAllGlobals();
+  });
+
+  it('exports MP3 files on-device from Camera and History via Piper or Kokoro, and guides phone users when offline voices are off', async () => {
+    const savedEntries: historyStore.HistoryEntry[] = [];
+    vi.spyOn(historyStore, 'saveHistoryEntry').mockImplementation(async (entry) => {
+      savedEntries.unshift(entry);
+    });
+    vi.spyOn(historyStore, 'listHistoryEntries').mockImplementation(async () => [...savedEntries]);
+
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+
+    const fetchMock = vi.fn().mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            text: 'The water cycle shows evaporation and condensation.',
+            model: 'anthropic/claude-haiku-5.5',
+            mode: 'describe',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const createdBlobs: Blob[] = [];
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      writable: true,
+      value: vi.fn((blob: Blob) => {
+        createdBlobs.push(blob);
+        return 'blob:mp3-test-url';
+      }),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+
+    const clickedDownloads: Array<{ href: string; download: string }> = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      clickedDownloads.push({ href: this.href, download: this.download });
+    });
+
+    try {
+      // 1. Phone with offline voices turned off -> helpful guidance in live status
+      const phoneRuntime = makeTestRuntime();
+      render(
+        <App
+          coordinator={phoneRuntime.coordinator}
+          kokoroClient={phoneRuntime.kokoroClient}
+          piperClient={phoneRuntime.piperClient}
+          deviceClassOverride="phone"
+        />,
+      );
+
+      const phoneGallery = screen.getByTestId('gallery-input') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(phoneGallery, {
+          target: { files: [new File(['photo'], 'water_cycle.png', { type: 'image/png' })] },
+        });
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('download-mp3-button')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByTestId('download-mp3-button'));
+      expect(screen.getByRole('status').textContent).toContain(strings.mp3NeedsOfflineVoicePhone);
+      expect(clickedDownloads).toHaveLength(0);
+
+      cleanup();
+
+      // 2. Laptop with Piper ready -> downloads real MP3 from Camera view using photo name
+      const laptopRuntime = makeTestRuntime();
+      laptopRuntime.kokoroClient.setExternalState({ status: 'skipped', progress: 0 });
+      laptopRuntime.piperClient.setExternalState({ status: 'ready', progress: 100, tooSlow: false });
+      const piperWavSpy = vi
+        .spyOn(laptopRuntime.piperClient, 'synthesizeToWavChunks')
+        .mockResolvedValue([buildTestWavArrayBuffer({ sampleRate: 22050, numSamples: 4410, amplitude: 6000 })]);
+
+      render(
+        <App
+          coordinator={laptopRuntime.coordinator}
+          kokoroClient={laptopRuntime.kokoroClient}
+          piperClient={laptopRuntime.piperClient}
+          deviceClassOverride="laptop"
+          hasWebGpuAdapterOverride={async () => false}
+        />,
+      );
+
+      const laptopGallery = screen.getByTestId('gallery-input') as HTMLInputElement;
+      await act(async () => {
+        fireEvent.change(laptopGallery, {
+          target: { files: [new File(['photo'], 'water_cycle.png', { type: 'image/png' })] },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('download-mp3-button')).toBeDefined();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('download-mp3-button'));
+      });
+
+      await waitFor(() => {
+        expect(clickedDownloads).toHaveLength(1);
+      });
+      expect(piperWavSpy).toHaveBeenCalledTimes(1);
+      expect(clickedDownloads[0].download).toBe('water-cycle-quick-look.mp3');
+      expect(createdBlobs[0].type).toBe('audio/mpeg');
+      expect(createdBlobs[0].size).toBeGreaterThan(500);
+      expect(screen.getByRole('status').textContent).toContain(
+        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoicePiper),
+      );
+
+      // 3. Switch Kokoro to ready and download again from History tab
+      act(() => {
+        laptopRuntime.kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: false });
+      });
+      const kokoroSamples = new Float32Array(4800);
+      for (let i = 0; i < kokoroSamples.length; i += 1) {
+        kokoroSamples[i] = 0.25 * Math.sin((2 * Math.PI * 440 * i) / 24000);
+      }
+      const kokoroChunkSpy = vi
+        .spyOn(laptopRuntime.kokoroClient, 'synthesizeToChunks')
+        .mockResolvedValue([{ samples: kokoroSamples, sampleRate: 24000 }]);
+
+      fireEvent.click(screen.getAllByRole('button', { name: strings.tabHistory })[0]);
+      await waitFor(() => {
+        expect(screen.getAllByRole('button', { name: strings.historyDownloadMp3 }).length).toBeGreaterThan(0);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getAllByRole('button', { name: strings.historyDownloadMp3 })[0]);
+      });
+
+      await waitFor(() => {
+        expect(clickedDownloads).toHaveLength(2);
+      });
+      expect(kokoroChunkSpy).toHaveBeenCalledTimes(1);
+      expect(clickedDownloads[1].download).toBe('water-cycle-quick-look.mp3');
+      expect(createdBlobs[1].type).toBe('audio/mpeg');
+      expect(screen.getByRole('status').textContent).toContain(
+        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoiceKokoro),
+      );
+    } finally {
+      clickSpy.mockRestore();
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: originalCreateObjectURL,
+      });
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: originalRevokeObjectURL,
+      });
+      vi.unstubAllGlobals();
+    }
   });
 });

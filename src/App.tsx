@@ -24,6 +24,13 @@ import {
 } from './settings.ts';
 import { SharedAudioContextManager } from './speech/chunkAudioPlayer.ts';
 import { KokoroBrowserClient, type KokoroState } from './speech/kokoroClient.ts';
+import {
+  buildMp3Filename,
+  exportSpeechToMp3,
+  resolveMp3Provider,
+  triggerMp3Download,
+  type OfflineMp3ProviderId,
+} from './speech/mp3Export.ts';
 import { coordinateOfflineVoiceStartup, probeWebGpuAdapter } from './speech/offlineVoiceController.ts';
 import { PiperBrowserClient, type PiperState } from './speech/piperClient.ts';
 import {
@@ -127,8 +134,11 @@ export function App({
   const [speechStatus, setSpeechStatus] = useState<SpeechStatusSnapshot>(() => runtime.coordinator.getStatus());
   const [lastVoiceUsed, setLastVoiceUsed] = useState<VoiceProviderId | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mp3Busy, setMp3Busy] = useState(false);
+  const [mp3Progress, setMp3Progress] = useState<{ done: number; total: number } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [preparedPhoto, setPreparedPhoto] = useState<PreparedPhoto | null>(null);
+  const [preparedPhotoSourceName, setPreparedPhotoSourceName] = useState<string | undefined>(undefined);
   const [currentResult, setCurrentResult] = useState<DescriptionResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [savedVisible, setSavedVisible] = useState(false);
@@ -480,7 +490,11 @@ export function App({
     runtime.coordinator.unlockAudioOnly();
   };
 
-  const handleDescribePrepared = async (photo: PreparedPhoto, mode: PromptMode) => {
+  const handleDescribePrepared = async (
+    photo: PreparedPhoto,
+    mode: PromptMode,
+    sourceName?: string,
+  ) => {
     if (!online) {
       setStatusMessage(strings.statusOfflineCannotDescribe);
       return;
@@ -508,6 +522,7 @@ export function App({
         return;
       }
 
+      const resolvedSourceName = sourceName ?? preparedPhotoSourceName;
       const entry: HistoryEntry = {
         id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -516,6 +531,7 @@ export function App({
         mode: data.mode ?? mode,
         model: data.model ?? 'vision',
         text: data.text,
+        sourceName: resolvedSourceName,
         thumbnailDataUrl: photo.thumbnailDataUrl,
       };
 
@@ -537,6 +553,95 @@ export function App({
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const mp3Provider = useMemo(
+    () =>
+      resolveMp3Provider({
+        deviceClass,
+        voiceOrder: settings.voiceOrder,
+        kokoroReady: kokoroState.status === 'ready',
+        kokoroAllowed,
+        kokoroTooSlow: kokoroState.tooSlow,
+        piperReady: piperState.status === 'ready',
+        piperAllowed,
+        piperTooSlow: piperState.tooSlow,
+      }),
+    [
+      deviceClass,
+      settings.voiceOrder,
+      kokoroState.status,
+      kokoroState.tooSlow,
+      kokoroAllowed,
+      piperState.status,
+      piperState.tooSlow,
+      piperAllowed,
+    ],
+  );
+
+  const handleDownloadMp3 = async (item: {
+    text: string;
+    mode: PromptMode;
+    createdAt: number;
+    sourceName?: string;
+  }) => {
+    if (mp3Busy) return;
+
+    if (!mp3Provider) {
+      if (deviceClass === 'phone' && !settings.kokoroEnabledOnPhone && !settings.piperEnabledOnPhone) {
+        setStatusMessage(strings.mp3NeedsOfflineVoicePhone);
+      } else {
+        setStatusMessage(strings.mp3WaitOfflineVoice);
+      }
+      return;
+    }
+
+    setMp3Busy(true);
+    setMp3Progress(null);
+    setStatusMessage(strings.downloadingMp3);
+
+    const tryExport = async (provider: OfflineMp3ProviderId) =>
+      exportSpeechToMp3({
+        rawText: item.text,
+        provider,
+        kokoroVoiceId: settings.kokoroVoiceId,
+        speechRate: settings.speechRate,
+        kokoroClient: runtime.kokoro,
+        piperClient: runtime.piper,
+        onProgress: (done, total) => setMp3Progress({ done, total }),
+      });
+
+    try {
+      let exported: { blob: Blob; provider: OfflineMp3ProviderId };
+      try {
+        exported = await tryExport(mp3Provider);
+      } catch {
+        const fallbackProvider: OfflineMp3ProviderId | null =
+          mp3Provider === 'kokoro' && piperAllowed && piperState.status === 'ready'
+            ? 'piper'
+            : mp3Provider === 'piper' && kokoroAllowed && kokoroState.status === 'ready'
+              ? 'kokoro'
+              : null;
+        if (!fallbackProvider) throw new Error('MP3 synthesis failed');
+        setMp3Progress(null);
+        exported = await tryExport(fallbackProvider);
+      }
+
+      const filename = buildMp3Filename({
+        sourceName: item.sourceName,
+        mode: item.mode,
+        createdAt: item.createdAt,
+      });
+      triggerMp3Download(exported.blob, filename);
+      const voiceLabel =
+        exported.provider === 'kokoro' ? strings.activeVoiceKokoro : strings.activeVoicePiper;
+      setStatusMessage(strings.mp3ReadyStatusTemplate.replace('{voice}', voiceLabel));
+    } catch {
+      setStatusMessage(strings.mp3Failed);
+    } finally {
+      setMp3Busy(false);
+      setMp3Progress(null);
     }
   };
 
@@ -650,6 +755,14 @@ export function App({
             <CaptureView
               online={online}
               busy={busy}
+              mp3Busy={mp3Busy}
+              mp3ProgressLabel={
+                mp3Progress
+                  ? strings.mp3MakingProgressTemplate
+                      .replace('{done}', String(mp3Progress.done))
+                      .replace('{total}', String(mp3Progress.total))
+                  : null
+              }
               preparedPhoto={preparedPhoto}
               currentResult={currentResult}
               speechStatus={speechStatus}
@@ -657,8 +770,12 @@ export function App({
               settings={settings}
               onUnlockCapture={handleUnlockCapture}
               onUnlockPlayback={handleUnlockPlayback}
-              onPreparedPhoto={setPreparedPhoto}
+              onPreparedPhoto={(photo, sourceName) => {
+                setPreparedPhoto(photo);
+                setPreparedPhotoSourceName(sourceName);
+              }}
               onDescribePrepared={handleDescribePrepared}
+              onDownloadMp3={(result) => void handleDownloadMp3(result)}
               onStatusAnnouncement={setStatusMessage}
               onTogglePause={handleTogglePause}
               onPlayResult={(text) => speakText(text)}
@@ -671,6 +788,7 @@ export function App({
           {activeTab === 'history' && (
             <HistoryView
               entries={history}
+              mp3Busy={mp3Busy}
               onPlayEntry={(entry) => {
                 handleUnlockPlayback();
                 setCurrentResult(entry);
@@ -680,6 +798,7 @@ export function App({
                 setCurrentResult(entry);
                 setActiveTab('camera');
               }}
+              onDownloadMp3={(entry) => void handleDownloadMp3(entry)}
               onDeleteEntry={(id) => void handleDeleteHistory(id)}
               onClearAll={() => void handleClearHistory()}
             />

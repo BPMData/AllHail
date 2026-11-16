@@ -26,6 +26,7 @@ AllHail is free and non-commercial. **Don't sell it or charge for it** while it 
 | `onnxruntime-web` | MIT | [github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) |
 | `@mintplex-labs/piper-tts-web` | MIT | [npmjs.com/package/@mintplex-labs/piper-tts-web](https://www.npmjs.com/package/@mintplex-labs/piper-tts-web) |
 | `@diffusionstudio/piper-wasm` | MIT (package); contains eSpeak NG, GPL-3.0-or-later | [github.com/diffusion-studio/piper-wasm](https://github.com/diffusion-studio/piper-wasm) |
+| `@breezystack/lamejs` | LGPL-3.0 | [github.com/shijinyu/lamejs](https://github.com/shijinyu/lamejs) |
 | React, React DOM | MIT | [github.com/facebook/react](https://github.com/facebook/react) |
 | Workbox (via `vite-plugin-pwa`) | MIT | [github.com/GoogleChrome/workbox](https://github.com/GoogleChrome/workbox) |
 

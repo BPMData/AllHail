@@ -23,6 +23,7 @@
     "express": "^4.21.2"
   },
   "devDependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@diffusionstudio/piper-wasm": "^1.0.0",
     "@mintplex-labs/piper-tts-web": "^1.0.5",
     "@playwright/test": "^1.65.1",

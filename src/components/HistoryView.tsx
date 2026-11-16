@@ -4,16 +4,20 @@ import type { HistoryEntry } from '../historyStore.ts';
 
 type HistoryViewProps = {
   entries: HistoryEntry[];
+  mp3Busy?: boolean;
   onPlayEntry: (entry: HistoryEntry) => void;
   onOpenEntry: (entry: HistoryEntry) => void;
+  onDownloadMp3?: (entry: HistoryEntry) => void;
   onDeleteEntry: (id: string) => void;
   onClearAll: () => void;
 };
 
 export function HistoryView({
   entries,
+  mp3Busy = false,
   onPlayEntry,
   onOpenEntry,
+  onDownloadMp3,
   onDeleteEntry,
   onClearAll,
 }: HistoryViewProps) {
@@ -97,6 +101,17 @@ export function HistoryView({
                       >
                         {strings.historyOpen}
                       </button>
+                      {onDownloadMp3 && (
+                        <button
+                          type="button"
+                          disabled={mp3Busy}
+                          aria-busy={mp3Busy}
+                          onClick={() => onDownloadMp3(entry)}
+                          className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold disabled:opacity-60"
+                        >
+                          {mp3Busy ? strings.downloadingMp3 : strings.historyDownloadMp3}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => onDeleteEntry(entry.id)}
