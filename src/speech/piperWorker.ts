@@ -40,7 +40,7 @@ async function ensureSession(reset = false): Promise<TtsSession> {
   sessionPromise = (async () => {
     try {
       const loaded = await loadPiperSession<TtsSession>({
-        sessionClass: TtsSession,
+        sessionClass: TtsSession as unknown as import('./piperLoader.ts').PiperSessionConstructorLike<TtsSession>,
         reset,
         onProgress: reportModelProgress,
         sizeMb: PIPER_TOTAL_SIZE_MB,

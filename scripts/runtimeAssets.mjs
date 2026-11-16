@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -12,28 +13,25 @@ export const PIPER_VOICE_ID = 'en_US-hfc_female-medium';
 export const PIPER_MODEL_BYTES = 63_201_294;
 export const PIPER_CONFIG_BYTES = 5_000;
 
+// Ship one ONNX WASM variant only: it handles both WebGPU (Kokoro) and plain WASM (Piper).
 export const ORT_RUNTIME_FILES = [
-  'ort-wasm-simd-threaded.mjs',
-  'ort-wasm-simd-threaded.wasm',
   'ort-wasm-simd-threaded.jsep.mjs',
   'ort-wasm-simd-threaded.jsep.wasm',
 ];
 
-export const PIPER_ORT_RUNTIME_FILES = [
-  'ort-wasm-simd-threaded.mjs',
-  'ort-wasm-simd-threaded.wasm',
-];
+export const PIPER_ORT_RUNTIME_FILES = [...ORT_RUNTIME_FILES];
 
 export const PIPER_PHONEMIZE_FILES = [
   'piper_phonemize.wasm',
   'piper_phonemize.data',
 ];
 
-export function syncSelfHostedRuntimes(rootDir = process.cwd()) {
+export function copySelfHostedRuntimesToDist(rootDir = process.cwd()) {
   const ortSrcDir = resolve(rootDir, 'node_modules/onnxruntime-web/dist');
   const piperSrcDir = resolve(rootDir, 'node_modules/@diffusionstudio/piper-wasm/build');
-  const ortDestDir = resolve(rootDir, 'public/ort');
-  const piperDestDir = resolve(rootDir, 'public/piper');
+  const distDir = resolve(rootDir, 'dist');
+  const ortDestDir = join(distDir, 'ort');
+  const piperDestDir = join(distDir, 'piper');
 
   if (!existsSync(ortSrcDir)) {
     throw new Error(`Missing onnxruntime-web dist directory at ${ortSrcDir}`);
@@ -44,6 +42,13 @@ export function syncSelfHostedRuntimes(rootDir = process.cwd()) {
 
   mkdirSync(ortDestDir, { recursive: true });
   mkdirSync(piperDestDir, { recursive: true });
+
+  // Remove any non-JSEP or stale ONNX files from dist/ort.
+  for (const existing of readdirSync(ortDestDir)) {
+    if (!ORT_RUNTIME_FILES.includes(existing)) {
+      rmSync(join(ortDestDir, existing), { force: true, recursive: true });
+    }
+  }
 
   for (const file of ORT_RUNTIME_FILES) {
     const src = join(ortSrcDir, file);
@@ -63,26 +68,25 @@ export function syncSelfHostedRuntimes(rootDir = process.cwd()) {
 
   const creditsSrc = resolve(rootDir, 'CREDITS.md');
   if (existsSync(creditsSrc)) {
-    mkdirSync(resolve(rootDir, 'public'), { recursive: true });
-    copyFileSync(creditsSrc, resolve(rootDir, 'public/CREDITS.md'));
+    copyFileSync(creditsSrc, join(distDir, 'CREDITS.md'));
   }
 
   return measurePiperDownloadSize(rootDir);
 }
 
 export function measurePiperDownloadSize(rootDir = process.cwd()) {
-  const ortDir = resolve(rootDir, 'public/ort');
-  const piperDir = resolve(rootDir, 'public/piper');
-  const ortFallbackDir = resolve(rootDir, 'node_modules/onnxruntime-web/dist');
-  const piperFallbackDir = resolve(rootDir, 'node_modules/@diffusionstudio/piper-wasm/build');
+  const ortSrcDir = resolve(rootDir, 'node_modules/onnxruntime-web/dist');
+  const piperSrcDir = resolve(rootDir, 'node_modules/@diffusionstudio/piper-wasm/build');
+  const ortDistDir = resolve(rootDir, 'dist/ort');
+  const piperDistDir = resolve(rootDir, 'dist/piper');
 
   let runtimeBytes = 0;
   for (const file of PIPER_ORT_RUNTIME_FILES) {
-    const p = existsSync(join(ortDir, file)) ? join(ortDir, file) : join(ortFallbackDir, file);
+    const p = existsSync(join(ortSrcDir, file)) ? join(ortSrcDir, file) : join(ortDistDir, file);
     runtimeBytes += statSync(p).size;
   }
   for (const file of PIPER_PHONEMIZE_FILES) {
-    const p = existsSync(join(piperDir, file)) ? join(piperDir, file) : join(piperFallbackDir, file);
+    const p = existsSync(join(piperSrcDir, file)) ? join(piperSrcDir, file) : join(piperDistDir, file);
     runtimeBytes += statSync(p).size;
   }
 
@@ -180,5 +184,59 @@ export function verifySingleOnnxRuntime(rootDir = process.cwd(), { checkDist = t
     version: pkgVersions[0],
     locations: pkgEntries.map((e) => dirname(e.path)),
     distVersions,
+  };
+}
+
+export function verifyDistRuntimeAssets(rootDir = process.cwd()) {
+  const distDir = resolve(rootDir, 'dist');
+  const ortDir = join(distDir, 'ort');
+  const piperDir = join(distDir, 'piper');
+  const assetsDir = join(distDir, 'assets');
+
+  if (!existsSync(ortDir)) {
+    throw new Error(`Missing built ONNX runtime directory at ${ortDir}`);
+  }
+  const actualOrtFiles = readdirSync(ortDir).sort();
+  const expectedOrtFiles = [...ORT_RUNTIME_FILES].sort();
+  if (
+    actualOrtFiles.length !== expectedOrtFiles.length ||
+    actualOrtFiles.some((file, index) => file !== expectedOrtFiles[index])
+  ) {
+    throw new Error(
+      `Expected dist/ort to contain only ${expectedOrtFiles.join(', ')}, found: ${actualOrtFiles.join(', ')}`,
+    );
+  }
+
+  if (!existsSync(piperDir)) {
+    throw new Error(`Missing built Piper runtime directory at ${piperDir}`);
+  }
+  for (const file of PIPER_PHONEMIZE_FILES) {
+    if (!existsSync(join(piperDir, file))) {
+      throw new Error(`Missing built Piper file: ${join(piperDir, file)}`);
+    }
+  }
+
+  if (existsSync(assetsDir)) {
+    const duplicateOrtAssets = readdirSync(assetsDir).filter((file) =>
+      /^ort-wasm.*\.(?:wasm|mjs)$/i.test(file),
+    );
+    if (duplicateOrtAssets.length > 0) {
+      throw new Error(
+        `Found duplicate ONNX WASM assets in dist/assets/: ${duplicateOrtAssets.join(', ')}`,
+      );
+    }
+  }
+
+  const swPath = join(distDir, 'sw.js');
+  if (existsSync(swPath)) {
+    const sw = readFileSync(swPath, 'utf8');
+    if (/ort-wasm-simd-threaded|piper_phonemize/.test(sw.split('precacheAndRoute')[1]?.split(']')[0] ?? '')) {
+      throw new Error('Workbox precache manifest must not include /ort/ or /piper/ runtime binaries.');
+    }
+  }
+
+  return {
+    ortFiles: actualOrtFiles,
+    piperFiles: PIPER_PHONEMIZE_FILES,
   };
 }

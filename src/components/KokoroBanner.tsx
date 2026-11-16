@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { strings } from '../../shared/strings.ts';
 import type { KokoroState } from '../speech/kokoroClient.ts';
+import { PIPER_TOTAL_SIZE_MB } from '../speech/piperAssets.ts';
 import type { PiperState } from '../speech/piperClient.ts';
 
 type KokoroBannerProps = {
@@ -57,7 +58,7 @@ export function KokoroBanner({
   if (activeError) {
     const label =
       activeError.kind === 'piper'
-        ? strings.piperBannerTitleTemplate.replace('{size}', String(piperState?.sizeMb ?? 93))
+        ? strings.piperBannerTitleTemplate.replace('{size}', String(piperState?.sizeMb ?? PIPER_TOTAL_SIZE_MB))
         : strings.kokoroBannerTitle;
     const message = activeError.kind === 'piper' ? strings.piperStatusError : strings.kokoroStatusError;
     return (

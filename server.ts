@@ -69,9 +69,19 @@ export async function createApp({
   } else {
     const { createServer } = await import('vite');
     const vite = await createServer({ root, server: { middlewareMode: true }, appType: 'spa' });
-    // Serve self-hosted ONNX and Piper runtimes directly so Vite does not reject dynamic .mjs imports from /public.
-    app.use('/ort', express.static(resolve(root, 'public/ort')));
-    app.use('/piper', express.static(resolve(root, 'public/piper')));
+    // Serve the single self-hosted JSEP ONNX variant, Piper phonemizer, and CREDITS directly from node_modules/root.
+    const devRuntimeFiles = new Map<string, string>([
+      ['/ort/ort-wasm-simd-threaded.jsep.mjs', resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs')],
+      ['/ort/ort-wasm-simd-threaded.jsep.wasm', resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm')],
+      ['/piper/piper_phonemize.wasm', resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.wasm')],
+      ['/piper/piper_phonemize.data', resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.data')],
+      ['/CREDITS.md', resolve(root, 'CREDITS.md')],
+    ]);
+    app.use((req, res, next) => {
+      const target = devRuntimeFiles.get(req.path);
+      if (!target) return next();
+      return res.sendFile(target);
+    });
     app.use(vite.middlewares);
   }
 

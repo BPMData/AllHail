@@ -14,7 +14,7 @@ AllHail is free and non-commercial. **Don't sell it or charge for it** while it 
 |---|---|---|---|
 | Kokoro-82M | Kokoro voice | Apache-2.0 | hexgrad, [huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M); ONNX export [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) |
 | eSpeak NG (via `phonemizer`, and Piper's phonemizer) | Turning text into speech sounds for Kokoro and Piper | GPL-3.0-or-later | [github.com/espeak-ng/espeak-ng](https://github.com/espeak-ng/espeak-ng) |
-| Piper voice `en_US-hfc_female-medium` *(when enabled)* | Piper voice | CC BY-NC-SA 4.0 (dataset) | Hi-Fi-CAPTAIN corpus, NICT ([ast-astrec.nict.go.jp/en/release/hi-fi-captain](https://ast-astrec.nict.go.jp/en/release/hi-fi-captain/)); fine-tuned from the Hi-Fi TTS voice of Cori Samuel; model by Rhasspy Piper ([huggingface.co/rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices)). Non-commercial use only; adaptations must share alike |
+| Piper voice `en_US-hfc_female-medium` | Piper voice | CC BY-NC-SA 4.0 (dataset) | Hi-Fi-CAPTAIN corpus, NICT ([ast-astrec.nict.go.jp/en/release/hi-fi-captain](https://ast-astrec.nict.go.jp/en/release/hi-fi-captain/)); fine-tuned from the Hi-Fi TTS voice of Cori Samuel; model by Rhasspy Piper ([huggingface.co/rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices)). Non-commercial use only; adaptations must share alike |
 
 ## Libraries shipped to the browser
 
@@ -24,7 +24,8 @@ AllHail is free and non-commercial. **Don't sell it or charge for it** while it 
 | `phonemizer` | Apache-2.0 (package); contains eSpeak NG, GPL-3.0-or-later | [github.com/xenova/phonemizer.js](https://github.com/xenova/phonemizer.js) |
 | `@huggingface/transformers` | Apache-2.0 | [github.com/huggingface/transformers.js](https://github.com/huggingface/transformers.js) |
 | `onnxruntime-web` | MIT | [github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) |
-| `@mintplex-labs/piper-tts-web` *(when enabled)* | MIT | [npmjs.com/package/@mintplex-labs/piper-tts-web](https://www.npmjs.com/package/@mintplex-labs/piper-tts-web) |
+| `@mintplex-labs/piper-tts-web` | MIT | [npmjs.com/package/@mintplex-labs/piper-tts-web](https://www.npmjs.com/package/@mintplex-labs/piper-tts-web) |
+| `@diffusionstudio/piper-wasm` | MIT (package); contains eSpeak NG, GPL-3.0-or-later | [github.com/diffusion-studio/piper-wasm](https://github.com/diffusion-studio/piper-wasm) |
 | React, React DOM | MIT | [github.com/facebook/react](https://github.com/facebook/react) |
 | Workbox (via `vite-plugin-pwa`) | MIT | [github.com/GoogleChrome/workbox](https://github.com/GoogleChrome/workbox) |
 

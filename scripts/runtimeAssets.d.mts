@@ -23,7 +23,12 @@ export interface VerifySingleOnnxRuntimeResult {
   distVersions: string[];
 }
 
-export declare function syncSelfHostedRuntimes(rootDir?: string): PiperSizeMeasurement;
+export interface VerifyDistRuntimeAssetsResult {
+  ortFiles: string[];
+  piperFiles: string[];
+}
+
+export declare function copySelfHostedRuntimesToDist(rootDir?: string): PiperSizeMeasurement;
 export declare function measurePiperDownloadSize(rootDir?: string): PiperSizeMeasurement;
 export declare function findOnnxRuntimeVersionsInNodeModules(
   rootDir?: string,
@@ -33,3 +38,4 @@ export declare function verifySingleOnnxRuntime(
   rootDir?: string,
   options?: { checkDist?: boolean },
 ): VerifySingleOnnxRuntimeResult;
+export declare function verifyDistRuntimeAssets(rootDir?: string): VerifyDistRuntimeAssetsResult;

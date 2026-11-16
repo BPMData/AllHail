@@ -19,15 +19,12 @@
     "test:pwa": "playwright test"
   },
   "dependencies": {
-    "@diffusionstudio/piper-wasm": "^1.0.0",
-    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "kokoro-js": "^1.2.1",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1"
+    "express": "^4.21.2"
   },
   "devDependencies": {
+    "@diffusionstudio/piper-wasm": "^1.0.0",
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/react": "^16.3.3",
@@ -37,6 +34,9 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "jsdom": "^31.0.1",
+    "kokoro-js": "^1.2.1",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
@@ -45,6 +45,8 @@
     "vitest": "^5.1.0"
   },
   "overrides": {
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4"
+    "onnxruntime-node": "file:./stubs/empty-package",
+    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4",
+    "sharp": "file:./stubs/empty-package"
   }
 }

@@ -2,7 +2,7 @@ import { isAudibleWaveform } from './chunkAudioPlayer.ts';
 import { PIPER_TOTAL_SIZE_MB, PIPER_VOICE_ID, PIPER_WASM_PATHS } from './piperAssets.ts';
 
 export type PiperWasmPaths = {
-  onnxWasm: string;
+  onnxWasm: string | { readonly mjs: string; readonly wasm: string };
   piperWasm: string;
   piperData: string;
 };

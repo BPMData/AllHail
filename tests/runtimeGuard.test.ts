@@ -2,11 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ORT_RUNTIME_FILES,
   findOnnxRuntimeVersionsInNodeModules,
   measurePiperDownloadSize,
+  verifyDistRuntimeAssets,
   verifySingleOnnxRuntime,
 } from '../scripts/runtimeAssets.mjs';
-import { PIPER_TOTAL_SIZE_MB } from '../src/speech/piperAssets.ts';
+import { PIPER_RUNTIME_FILES, PIPER_TOTAL_SIZE_MB, PIPER_WASM_PATHS } from '../src/speech/piperAssets.ts';
 
 describe('single onnxruntime-web and PWA runtime precache exclusion', () => {
   it('installs strictly one onnxruntime-web version matching @huggingface/transformers', () => {
@@ -15,6 +17,30 @@ describe('single onnxruntime-web and PWA runtime precache exclusion', () => {
     const uniqueVersions = [...new Set(versions.map((v) => v.version))];
     expect(uniqueVersions).toEqual(['1.22.0-dev.20250409-89f8206ba4']);
     expect(() => verifySingleOnnxRuntime(root, { checkDist: false })).not.toThrow();
+  });
+
+  it('ships only the single .jsep ONNX WASM variant and never duplicates runtimes in public/', () => {
+    const root = resolve(process.cwd());
+    expect(ORT_RUNTIME_FILES).toEqual([
+      'ort-wasm-simd-threaded.jsep.mjs',
+      'ort-wasm-simd-threaded.jsep.wasm',
+    ]);
+    expect(PIPER_WASM_PATHS.onnxWasm).toEqual({
+      mjs: '/ort/ort-wasm-simd-threaded.jsep.mjs',
+      wasm: '/ort/ort-wasm-simd-threaded.jsep.wasm',
+    });
+    expect(PIPER_RUNTIME_FILES).toEqual([
+      '/ort/ort-wasm-simd-threaded.jsep.mjs',
+      '/ort/ort-wasm-simd-threaded.jsep.wasm',
+      '/piper/piper_phonemize.wasm',
+      '/piper/piper_phonemize.data',
+    ]);
+    expect(existsSync(resolve(root, 'public/ort'))).toBe(false);
+    expect(existsSync(resolve(root, 'public/piper'))).toBe(false);
+
+    if (existsSync(resolve(root, 'dist/assets'))) {
+      expect(() => verifyDistRuntimeAssets(root)).not.toThrow();
+    }
   });
 
   it('excludes /ort/ and /piper/ from Workbox precache while caching them on demand in allhail-piper-runtime', () => {
@@ -32,11 +58,11 @@ describe('single onnxruntime-web and PWA runtime precache exclusion', () => {
     }
   });
 
-  it('measures real combined Piper download size (model + ONNX/phonemize runtimes)', () => {
+  it('measures real combined Piper download size (model + JSEP ONNX/phonemize runtimes)', () => {
     const measured = measurePiperDownloadSize(process.cwd());
-    expect(measured.runtimeBytes).toBeGreaterThan(20_000_000);
+    expect(measured.runtimeBytes).toBeGreaterThan(35_000_000);
     expect(measured.modelBytes).toBeGreaterThan(60_000_000);
     expect(measured.sizeMb).toBe(PIPER_TOTAL_SIZE_MB);
-    expect(measured.sizeMb).toBeGreaterThan(80);
+    expect(measured.sizeMb).toBeGreaterThan(95);
   });
 });

@@ -3,13 +3,41 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import {
+  copySelfHostedRuntimesToDist,
   measurePiperDownloadSize,
-  syncSelfHostedRuntimes,
+  verifyDistRuntimeAssets,
   verifySingleOnnxRuntime,
 } from './scripts/runtimeAssets.mjs';
 import { strings } from './shared/strings.ts';
 
 const initialPiperSize = measurePiperDownloadSize(process.cwd());
+
+function dedupeSelfHostedOnnxWasm() {
+  return {
+    name: 'allhail-dedupe-onnx-wasm',
+    generateBundle(_options: unknown, bundle: Record<string, { type: string; fileName: string; code?: string }>) {
+      const removedAssets: string[] = [];
+      for (const [key, item] of Object.entries(bundle)) {
+        if (item.type === 'asset' && /^assets\/ort-wasm-simd-threaded.*\.(?:wasm|mjs)$/.test(key)) {
+          removedAssets.push(key);
+          delete bundle[key];
+        }
+      }
+      if (removedAssets.length > 0) {
+        for (const item of Object.values(bundle)) {
+          if (item.type === 'chunk' && typeof item.code === 'string') {
+            for (const assetPath of removedAssets) {
+              const target = assetPath.endsWith('.mjs')
+                ? '/ort/ort-wasm-simd-threaded.jsep.mjs'
+                : '/ort/ort-wasm-simd-threaded.jsep.wasm';
+              item.code = item.code.replaceAll(`/${assetPath}`, target);
+            }
+          }
+        }
+      }
+    },
+  };
+}
 
 export default defineConfig({
   define: {
@@ -17,6 +45,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+    plugins: () => [dedupeSelfHostedOnnxWasm()],
   },
   server: {
     host: '0.0.0.0',
@@ -25,18 +54,19 @@ export default defineConfig({
     hmr: false,
   },
   plugins: [
+    dedupeSelfHostedOnnxWasm(),
     {
       name: 'allhail-self-hosted-runtimes',
       configureServer() {
-        syncSelfHostedRuntimes(process.cwd());
         verifySingleOnnxRuntime(process.cwd(), { checkDist: false });
       },
       buildStart() {
-        syncSelfHostedRuntimes(process.cwd());
         verifySingleOnnxRuntime(process.cwd(), { checkDist: false });
       },
       closeBundle() {
+        copySelfHostedRuntimesToDist(process.cwd());
         verifySingleOnnxRuntime(process.cwd(), { checkDist: true });
+        verifyDistRuntimeAssets(process.cwd());
       },
     },
     react(),
@@ -55,7 +85,7 @@ export default defineConfig({
     VitePWA({
       // Ask before updating, so future speech jobs and edits aren't interrupted.
       registerType: 'prompt',
-      includeAssets: ['icons/*', 'CREDITS.md'],
+      includeAssets: ['icons/*'],
       manifest: {
         id: '/',
         name: strings.appName,
