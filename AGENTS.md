@@ -18,6 +18,8 @@
    - Haiku 5.5, Qwen 3.7 Flash and Gemma 4 can think until they run out of room and return nothing; send `reasoning: { enabled: false }` where the chain says "thinking off".
 6. **Accessibility comes first.** It must work fully with VoiceOver and TalkBack: large targets, every control labelled, status changes announced, speech that starts automatically. The text shown on screen stays as the model wrote it. Speech gets a cleaned copy: fractions become words, and markdown and `*asterisks*` are removed.
 
+7. **Licences.** AllHail is GPL-3.0-or-later because it ships eSpeak NG (GPL). Any new library, model, voice or data file that ships to users gets a row in [`CREDITS.md`](CREDITS.md) in the same change, with its licence and source link. Never add a dependency whose licence forbids redistribution, and never add anything that makes AllHail paid or commercial. The Piper voice `hfc_female` is CC BY-NC-SA, so non-commercial only.
+
 ## Stack and conventions (match the sibling apps)
 
 - Vite + React 19 + Tailwind 4 + TypeScript in the browser; Express `server.ts` on Node.
