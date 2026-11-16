@@ -73,13 +73,16 @@ Read [AGENTS.md](AGENTS.md) and [PLAN.md](PLAN.md) before changing the app. Keep
 
 ## Recover the Streamlit version
 
-The `streamlit-final` tag preserves the complete app before its removal. To open it separately without changing this checkout:
+The old Streamlit app lives in the archived [`BPMData/tts_st`](https://github.com/BPMData/tts_st) repository, under the `streamlit-final` tag. This repo doesn't have that tag. To get a copy in its own folder:
 
 ```bash
-git fetch origin tag streamlit-final
-git worktree add ../allhail-streamlit streamlit-final
+git clone --branch streamlit-final https://github.com/BPMData/tts_st.git ../allhail-streamlit
 ```
 
 The original Python files, Streamlit configuration and requirements are all there. No personal photos or secrets are included.
+
+## Licence and credits
+
+AllHail is free software under the GNU General Public License v3.0 or later ([`LICENSE`](LICENSE)). It ships eSpeak NG, which is GPL. [`CREDITS.md`](CREDITS.md) lists every voice, model and library with its licence. It's free and non-commercial; don't sell it while it uses the Piper voice.
 
 Created by a high school computer science teacher to help students with vision impairments.
