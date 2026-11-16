@@ -1,4 +1,3 @@
-import { splitTextForSpeech } from '../../shared/speechChunks.ts';
 import { cleanTextForSpeech } from '../../shared/speechCleaner.ts';
 import { strings } from '../../shared/strings.ts';
 import type { DeviceClass, VoiceOrderPreference } from '../settings.ts';
@@ -125,7 +124,7 @@ export function getDeviceVoiceShortName(name: string): string {
 }
 
 /**
- * Selects the best automatic English device voice following the ordered fallback rules,
+ * Selects the best automatic English device voice following the v3 priority order,
  * excluding novelty voices and skipping online-only voices when offline.
  */
 export function selectBestDeviceVoice(
@@ -137,37 +136,36 @@ export function selectBestDeviceVoice(
   const eligible = online ? allowed : allowed.filter((v) => !isOnlineOnlyDeviceVoice(v));
   if (eligible.length === 0) return null;
 
-  // a. "Allison (Enhanced)"
-  const allisonEnhanced = eligible.find((v) => matchesVoiceToken(v.name, 'allison (enhanced)'));
-  if (allisonEnhanced) return allisonEnhanced;
-
-  // b. Any other voice with "Premium" or "Enhanced" in its name
-  const premiumOrEnhanced = eligible.find((v) => /\b(?:premium|enhanced)\b/i.test(v.name));
-  if (premiumOrEnhanced) return premiumOrEnhanced;
-
-  // c. Any voice with "Natural" in its name
-  const natural = eligible.find((v) => /\bnatural\b/i.test(v.name));
-  if (natural) return natural;
-
-  // d. "Google US English", then "Google UK English Female"
-  for (const googleName of ['google us english', 'google uk english female']) {
+  // 1. "Google UK English Female", then "Google US English" (when online)
+  for (const googleName of ['google uk english female', 'google us english']) {
     const match = eligible.find((v) => matchesVoiceToken(v.name, googleName));
     if (match) return match;
   }
 
-  // e. Samantha, Ava, Daniel, Karen, Moira, Tessa, Rishi
+  // 2. Any voice with "Natural" in its name (e.g. Microsoft Edge online Natural voices)
+  const natural = eligible.find((v) => /\bnatural\b/i.test(v.name));
+  if (natural) return natural;
+
+  // 3. "Allison (Enhanced)", then any other voice with "Premium" or "Enhanced"
+  const allisonEnhanced = eligible.find((v) => matchesVoiceToken(v.name, 'allison (enhanced)'));
+  if (allisonEnhanced) return allisonEnhanced;
+
+  const premiumOrEnhanced = eligible.find((v) => /\b(?:premium|enhanced)\b/i.test(v.name));
+  if (premiumOrEnhanced) return premiumOrEnhanced;
+
+  // 4. Samantha, Ava, Daniel, Karen, Moira, Tessa, Rishi
   for (const curated of CURATED_NATURAL_NAMES) {
     const match = eligible.find((v) => matchesVoiceToken(v.name, curated));
     if (match) return match;
   }
 
-  // f. Eloquence voices: Reed, Sandy, Shelley, Flo, Eddy, Rocko, Grandma, Grandpa
+  // 5. Eloquence voices: Reed, Sandy, Shelley, Flo, Eddy, Rocko, Grandma, Grandpa
   for (const eloquence of ELOQUENCE_NAMES) {
     const match = eligible.find((v) => matchesVoiceToken(v.name, eloquence));
     if (match) return match;
   }
 
-  // g. System default voice (excluding novelty), then any other English voice
+  // 6. System default voice (excluding novelty), then any other English voice
   const systemDefault = eligible.find((v) => v.default);
   if (systemDefault) return systemDefault;
 
@@ -253,19 +251,91 @@ function pickCurrentVoice(
   }).voice;
 }
 
-export function createBrowserDeviceVoiceProvider(): VoiceProvider {
+export const VOICES_WAIT_TIMEOUT_MS = 1500;
+
+/**
+ * Waits for speechSynthesis.getVoices() to become non-empty via the `voiceschanged`
+ * event (up to `timeoutMs`, default 1.5 s) so Chrome never falls back to a robotic default.
+ */
+export function waitForDeviceVoices(
+  synth: SpeechSynthesis,
+  timeoutMs = VOICES_WAIT_TIMEOUT_MS,
+): { promise: Promise<readonly SpeechSynthesisVoice[]>; cancel: () => void } {
+  const initial = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
+  if (initial.length > 0) {
+    return {
+      promise: Promise.resolve(initial),
+      cancel: () => undefined,
+    };
+  }
+
+  let settled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cleanupListener: () => void = () => undefined;
+
+  const promise = new Promise<readonly SpeechSynthesisVoice[]>((resolve) => {
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      cleanupListener();
+      const latest = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
+      resolve(latest);
+    };
+
+    const onVoicesChanged = () => {
+      const latest = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
+      if (latest.length > 0) {
+        finish();
+      }
+    };
+
+    if (typeof synth.addEventListener === 'function') {
+      synth.addEventListener('voiceschanged', onVoicesChanged);
+      cleanupListener = () => {
+        synth.removeEventListener?.('voiceschanged', onVoicesChanged);
+      };
+    }
+
+    timer = setTimeout(finish, timeoutMs);
+  });
+
+  return {
+    promise,
+    cancel: () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      cleanupListener();
+    },
+  };
+}
+
+export function createBrowserDeviceVoiceProvider(options?: {
+  voicesWaitTimeoutMs?: number;
+}): VoiceProvider {
   const hasSynth = () =>
     typeof window !== 'undefined' &&
     'speechSynthesis' in window &&
     typeof SpeechSynthesisUtterance !== 'undefined';
 
-  // Trigger initial voice list loading and keep it warm when voiceschanged fires.
-  if (hasSynth() && typeof window.speechSynthesis.addEventListener === 'function') {
+  // Trigger initial voice list loading once and keep it warm when voiceschanged fires.
+  if (hasSynth()) {
     window.speechSynthesis.getVoices?.();
-    window.speechSynthesis.addEventListener('voiceschanged', () => {
-      window.speechSynthesis.getVoices?.();
-    });
+    if (typeof window.speechSynthesis.addEventListener === 'function') {
+      window.speechSynthesis.addEventListener('voiceschanged', () => {
+        window.speechSynthesis.getVoices?.();
+      });
+    }
   }
+
+  const voicesWaitTimeoutMs = options?.voicesWaitTimeoutMs ?? VOICES_WAIT_TIMEOUT_MS;
 
   return {
     id: 'device',
@@ -277,15 +347,15 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
         return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
       }
 
-      const chunks = splitTextForSpeech(cleanedText);
-      if (chunks.length === 0) {
+      const trimmed = cleanedText.trim();
+      if (!trimmed) {
         queueMicrotask(() => callbacks.onEnd?.());
         return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
       }
 
       let stopped = false;
-      let started = false;
       let pendingStartTimer: ReturnType<typeof setTimeout> | null = null;
+      let cancelVoicesWait: () => void = () => undefined;
       const synth = window.speechSynthesis;
       const wasActive = Boolean(synth.speaking || synth.pending);
 
@@ -293,19 +363,17 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
         synth.cancel();
       }
 
-      const selectedVoice = pickCurrentVoice(synth, {
-        deviceVoiceName: callbacks.deviceVoiceName,
-        online: callbacks.online,
-      });
-
-      const speakChunk = (index: number) => {
+      // Send the full text as ONE utterance with zero chunk splitting and no keepalive timers.
+      const speakSingleUtterance = (voices: readonly SpeechSynthesisVoice[]) => {
         if (stopped) return;
-        if (index >= chunks.length) {
-          callbacks.onEnd?.();
-          return;
-        }
+        const online =
+          callbacks.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+        const selectedVoice = resolveDeviceVoice(voices, {
+          preferredVoiceName: callbacks.deviceVoiceName,
+          online,
+        }).voice;
 
-        const utterance = new SpeechSynthesisUtterance(chunks[index]);
+        const utterance = new SpeechSynthesisUtterance(trimmed);
         utterance.rate = callbacks.rate;
         utterance.lang = selectedVoice?.lang || strings.language;
         if (selectedVoice) {
@@ -316,39 +384,40 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
 
         utterance.onstart = () => {
           if (stopped) return;
-          if (!started) {
-            started = true;
-            callbacks.onStart?.('device');
-          }
+          callbacks.onStart?.('device');
         };
 
         utterance.onend = () => {
           retainedUtterances.delete(utterance);
           if (stopped) return;
-          speakChunk(index + 1);
+          callbacks.onEnd?.();
         };
 
         utterance.onerror = () => {
           retainedUtterances.delete(utterance);
           if (stopped) return;
-          if (!started) {
-            callbacks.onError?.(new Error('Device voice failed'));
-          } else {
-            speakChunk(index + 1);
-          }
+          callbacks.onError?.(new Error('Device voice failed'));
         };
 
         synth.speak(utterance);
       };
 
-      // Avoid Chrome's synchronous cancel()-then-speak() drop bug when interrupting active speech.
-      if (wasActive) {
+      const initialVoices = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
+      if (initialVoices.length === 0) {
+        const waiter = waitForDeviceVoices(synth, voicesWaitTimeoutMs);
+        cancelVoicesWait = waiter.cancel;
+        void waiter.promise.then((loadedVoices) => {
+          if (stopped) return;
+          speakSingleUtterance(loadedVoices);
+        });
+      } else if (wasActive) {
+        // Avoid Chrome's synchronous cancel()-then-speak() drop bug when interrupting active speech.
         pendingStartTimer = setTimeout(() => {
           pendingStartTimer = null;
-          speakChunk(0);
+          speakSingleUtterance(typeof synth.getVoices === 'function' ? synth.getVoices() : initialVoices);
         }, 40);
       } else {
-        speakChunk(0);
+        speakSingleUtterance(initialVoices);
       }
 
       return {
@@ -360,6 +429,7 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
         },
         stop: () => {
           stopped = true;
+          cancelVoicesWait();
           if (pendingStartTimer !== null) {
             clearTimeout(pendingStartTimer);
             pendingStartTimer = null;

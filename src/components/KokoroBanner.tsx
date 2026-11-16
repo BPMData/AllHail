@@ -51,14 +51,18 @@ export function KokoroBanner({ kokoroState, onRetry }: KokoroBannerProps) {
 
   const startedAt = kokoroState.startedAt ?? now;
   const elapsedSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const bannerTitle =
+    kokoroState.backend === 'wasm' || kokoroState.sizeMb === 90
+      ? strings.kokoroBannerTitleWasm
+      : strings.kokoroBannerTitle;
 
   return (
     <section
-      aria-label={strings.kokoroBannerTitle}
+      aria-label={bannerTitle}
       data-testid="kokoro-banner"
       className="panel-card mb-4 rounded-2xl border-2 px-4 py-3"
     >
-      <p className="text-base font-bold">{strings.kokoroBannerTitle}</p>
+      <p className="text-base font-bold">{bannerTitle}</p>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <progress

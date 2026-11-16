@@ -1,4 +1,10 @@
 import { KokoroTTS } from 'kokoro-js';
+import {
+  hasAudiblePcm,
+  loadKokoroWithFallback,
+  type KokoroBackend,
+  type KokoroLoadProgress,
+} from './kokoroLoader.ts';
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 
@@ -9,29 +15,13 @@ type IncomingMessage =
 
 let ttsPromise: Promise<KokoroTTS> | null = null;
 let ttsInstance: KokoroTTS | null = null;
-let loadedTooSlow = false;
 const fileProgress = new Map<string, { loaded: number; total: number }>();
 const cancelledJobs = new Set<number>();
 
-export function hasAudiblePcm(samples: Float32Array | ArrayLike<number>): boolean {
-  if (!samples || samples.length === 0) return false;
-  let peak = 0;
-  for (let i = 0; i < samples.length; i += 1) {
-    const v = samples[i];
-    if (!Number.isFinite(v)) return false;
-    const abs = Math.abs(v);
-    if (abs > peak) peak = abs;
-  }
-  return peak > 1e-5;
-}
-
-function reportProgress(event: {
-  status?: string;
-  file?: string;
-  loaded?: number;
-  total?: number;
-  progress?: number;
-}) {
+function reportProgress(
+  event: KokoroLoadProgress,
+  info: { backend: KokoroBackend; sizeMb: number },
+) {
   if (event.file && typeof event.loaded === 'number' && typeof event.total === 'number' && event.total > 0) {
     fileProgress.set(event.file, { loaded: event.loaded, total: event.total });
     let loaded = 0;
@@ -41,7 +31,13 @@ function reportProgress(event: {
       total += entry.total;
     }
     const pct = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
-    self.postMessage({ type: 'status', status: 'downloading', progress: pct });
+    self.postMessage({
+      type: 'status',
+      status: 'downloading',
+      progress: pct,
+      backend: info.backend,
+      sizeMb: info.sizeMb,
+    });
     return;
   }
   if (typeof event.progress === 'number') {
@@ -49,31 +45,20 @@ function reportProgress(event: {
       type: 'status',
       status: 'downloading',
       progress: Math.min(99, Math.max(0, Math.round(event.progress))),
+      backend: info.backend,
+      sizeMb: info.sizeMb,
     });
   }
 }
 
-async function runCalibration(instance: KokoroTTS): Promise<boolean> {
+async function detectWebGpuAdapter(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
   try {
-    // Pass 1: warm up JIT/WASM allocations and discard timing.
-    await instance.generate('Warm up.', { voice: 'af_heart', speed: 1 });
-
-    // Pass 2: time a short calibration sentence against real-time audio duration.
-    const startedAt = performance.now();
-    const calibration = await instance.generate(
-      'AllHail helps students listen clearly.',
-      { voice: 'af_heart', speed: 1 },
-    );
-    const generationMs = performance.now() - startedAt;
-    const sampleRate = calibration.sampling_rate || 24000;
-    const audioMs = (calibration.audio.length / sampleRate) * 1000;
-
-    if (!hasAudiblePcm(calibration.audio) || audioMs <= 0) {
-      return true;
-    }
-    return generationMs > audioMs;
+    const adapter = await (navigator as Navigator & { gpu: { requestAdapter: () => Promise<unknown> } })
+      .gpu.requestAdapter();
+    return Boolean(adapter);
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -81,20 +66,39 @@ async function loadModel(): Promise<KokoroTTS> {
   if (ttsInstance) return ttsInstance;
   if (ttsPromise) return ttsPromise;
 
-  self.postMessage({ type: 'status', status: 'downloading', progress: 0 });
-
   ttsPromise = (async () => {
     try {
-      // Only run q8 with device "wasm"; WebGPU q8 produces silent NaN tensors on Chrome.
-      const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
-        dtype: 'q8',
-        device: 'wasm',
-        progress_callback: reportProgress,
+      const loaded = await loadKokoroWithFallback<KokoroTTS>({
+        hasWebGpuAdapter: detectWebGpuAdapter,
+        loadModel: ({ dtype, device, progress_callback }) =>
+          KokoroTTS.from_pretrained(MODEL_ID, {
+            dtype,
+            device,
+            progress_callback,
+          }),
+        onStageStart: ({ backend, sizeMb }) => {
+          fileProgress.clear();
+          self.postMessage({
+            type: 'status',
+            status: 'downloading',
+            progress: 0,
+            backend,
+            sizeMb,
+          });
+        },
+        onProgress: reportProgress,
       });
-      loadedTooSlow = await runCalibration(instance);
-      ttsInstance = instance;
-      self.postMessage({ type: 'status', status: 'ready', progress: 100, tooSlow: loadedTooSlow });
-      return instance;
+
+      ttsInstance = loaded.instance;
+      self.postMessage({
+        type: 'status',
+        status: 'ready',
+        progress: 100,
+        backend: loaded.backend,
+        sizeMb: loaded.sizeMb,
+        tooSlow: loaded.tooSlow,
+      });
+      return loaded.instance;
     } catch (error) {
       ttsPromise = null;
       throw error;

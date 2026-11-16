@@ -303,13 +303,14 @@ describe('app accessibility, PWA feedback, and student mode', () => {
 
     expect(screen.queryByTestId('kokoro-banner')).toBeNull();
 
-    // Start downloading at 0%
+    // Start downloading at 0% (WebGPU ~330 MB default)
     act(() => {
-      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs });
+      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs, backend: 'webgpu', sizeMb: 330 });
     });
 
     const banner = screen.getByTestId('kokoro-banner');
     expect(banner.textContent).toContain(strings.kokoroBannerTitle);
+    expect(banner.textContent).toContain('about 330 MB');
     expect(banner.textContent).toContain('0%');
     expect(banner.textContent).toContain(`${strings.kokoroElapsedLabel}: 00:00`);
     expect(banner.textContent).toContain(strings.kokoroBannerFallbackNote);
@@ -317,6 +318,17 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(progressEl.tagName).toBe('PROGRESS');
     expect(progressEl.value).toBe(0);
     expect(progressEl.closest('[aria-live]')).toBeNull();
+
+    // Switching to WASM q8 fallback updates the banner copy to about 90 MB
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs, backend: 'wasm', sizeMb: 90 });
+    });
+    expect(screen.getByTestId('kokoro-banner').textContent).toContain(strings.kokoroBannerTitleWasm);
+    expect(screen.getByTestId('kokoro-banner').textContent).toContain('about 90 MB');
+
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs, backend: 'webgpu', sizeMb: 330 });
+    });
 
     const liveStatus = screen.getByRole('status');
     expect(liveStatus.textContent).toContain(strings.kokoroAnnounceStart);

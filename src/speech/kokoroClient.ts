@@ -1,4 +1,5 @@
 import { splitTextForSpeech } from '../../shared/speechChunks.ts';
+import type { KokoroBackend } from './kokoroLoader.ts';
 
 export type KokoroStatus = 'idle' | 'downloading' | 'ready' | 'error';
 
@@ -7,6 +8,8 @@ export type KokoroState = {
   progress: number;
   tooSlow: boolean;
   startedAt: number | null;
+  backend?: KokoroBackend;
+  sizeMb?: number;
   error?: string;
 };
 
@@ -25,7 +28,15 @@ export type SpeechControlHandle = {
 };
 
 type WorkerEvent =
-  | { type: 'status'; status: KokoroStatus; progress?: number; tooSlow?: boolean; error?: string }
+  | {
+      type: 'status';
+      status: KokoroStatus;
+      progress?: number;
+      tooSlow?: boolean;
+      backend?: KokoroBackend;
+      sizeMb?: number;
+      error?: string;
+    }
   | { type: 'chunkAudio'; jobId: number; chunkIndex: number; samples: Float32Array; sampleRate: number }
   | { type: 'chunkError'; jobId: number; chunkIndex: number; error: string };
 
@@ -208,6 +219,8 @@ export class KokoroBrowserClient {
           progress: msg.progress ?? this.state.progress,
           tooSlow: typeof msg.tooSlow === 'boolean' ? msg.tooSlow : this.state.tooSlow,
           startedAt,
+          backend: msg.backend ?? this.state.backend,
+          sizeMb: msg.sizeMb ?? this.state.sizeMb,
           error: msg.error,
         });
         return;

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createBrowserDeviceVoiceProvider,
   getAllowedEnglishDeviceVoices,
   getDeviceVoiceShortName,
   resolveDeviceVoice,
   selectBestDeviceVoice,
   SpeechCoordinator,
+  VOICES_WAIT_TIMEOUT_MS,
   type VoiceProvider,
 } from './speechCoordinator.ts';
 
@@ -50,6 +52,7 @@ function makeVoice(name: string, lang: string, isDefault = false): SpeechSynthes
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('SpeechCoordinator', () => {
@@ -267,51 +270,53 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
     expect(selectBestDeviceVoice(noveltyList)).toBeNull();
   });
 
-  it('follows exact tier priority a -> b -> c -> d -> e -> f -> g', () => {
-    // g. System default over generic English, then first English
-    const tierG = [
+  it('follows v3 priority: Google UK Female -> Google US -> Natural -> Allison (Enhanced) -> Premium/Enhanced -> Samantha..Rishi -> Eloquence -> default', () => {
+    // System default over generic English, then first English
+    const tierDefault = [
       makeVoice('Alex', 'en-US', false),
       makeVoice('Custom Default', 'en-GB', true),
     ];
-    expect(selectBestDeviceVoice(tierG)?.name).toBe('Custom Default');
+    expect(selectBestDeviceVoice(tierDefault)?.name).toBe('Custom Default');
 
-    // f. Eloquence tier beats system default, ordered Reed -> ... -> Grandpa
-    const tierF = [
-      ...tierG,
+    // Eloquence tier beats system default, ordered Reed -> ... -> Grandpa
+    const tierEloquence = [
+      ...tierDefault,
       makeVoice('Grandpa (English (US))', 'en-US'),
       makeVoice('Sandy (English (US))', 'en-US'),
       makeVoice('Reed (English (US))', 'en-US'),
     ];
-    expect(selectBestDeviceVoice(tierF)?.name).toBe('Reed (English (US))');
+    expect(selectBestDeviceVoice(tierEloquence)?.name).toBe('Reed (English (US))');
 
-    // e. Samantha, Ava, Daniel, Karen, Moira, Tessa, Rishi beat Eloquence
-    const tierE = [...tierF, makeVoice('Moira', 'en-IE'), makeVoice('Samantha', 'en-US')];
-    expect(selectBestDeviceVoice(tierE)?.name).toBe('Samantha');
+    // Samantha, Ava, Daniel, Karen, Moira, Tessa, Rishi beat Eloquence
+    const tierCurated = [...tierEloquence, makeVoice('Moira', 'en-IE'), makeVoice('Samantha', 'en-US')];
+    expect(selectBestDeviceVoice(tierCurated)?.name).toBe('Samantha');
 
-    // d. Google US English beats Google UK English Female and tier e when online
-    const tierD = [
-      ...tierE,
-      makeVoice('Google UK English Female', 'en-GB'),
-      makeVoice('Google US English', 'en-US'),
-    ];
-    expect(selectBestDeviceVoice(tierD, { online: true })?.name).toBe('Google US English');
+    // Other Premium or Enhanced beats curated Apple voices
+    const tierPremium = [...tierCurated, makeVoice('Ava (Premium)', 'en-US')];
+    expect(selectBestDeviceVoice(tierPremium, { online: true })?.name).toBe('Ava (Premium)');
 
-    // c. Natural beats Google
-    const tierC = [
-      ...tierD,
+    // "Allison (Enhanced)" beats other Premium/Enhanced
+    const tierAllison = [...tierPremium, makeVoice('Allison (Enhanced)', 'en-US')];
+    expect(selectBestDeviceVoice(tierAllison, { online: true })?.name).toBe('Allison (Enhanced)');
+
+    // Edge "Natural" voices beat Allison (Enhanced)
+    const tierNatural = [
+      ...tierAllison,
       makeVoice('Microsoft Ava Online (Natural) - English (United States)', 'en-US'),
     ];
-    expect(selectBestDeviceVoice(tierC, { online: true })?.name).toBe(
+    expect(selectBestDeviceVoice(tierNatural, { online: true })?.name).toBe(
       'Microsoft Ava Online (Natural) - English (United States)',
     );
 
-    // b. Other Premium or Enhanced beats Natural
-    const tierB = [...tierC, makeVoice('Ava (Premium)', 'en-US')];
-    expect(selectBestDeviceVoice(tierB, { online: true })?.name).toBe('Ava (Premium)');
+    // Google US English beats Edge Natural when online
+    const tierGoogleUs = [...tierNatural, makeVoice('Google US English', 'en-US')];
+    expect(selectBestDeviceVoice(tierGoogleUs, { online: true })?.name).toBe('Google US English');
 
-    // a. "Allison (Enhanced)" wins above all other Premium/Enhanced
-    const tierA = [...tierB, makeVoice('Allison (Enhanced)', 'en-US')];
-    expect(selectBestDeviceVoice(tierA, { online: true })?.name).toBe('Allison (Enhanced)');
+    // Google UK English Female sits at #1 overall when online
+    const tierGoogleUk = [...tierGoogleUs, makeVoice('Google UK English Female', 'en-GB')];
+    expect(selectBestDeviceVoice(tierGoogleUk, { online: true })?.name).toBe(
+      'Google UK English Female',
+    );
   });
 
   it('skips Online and Google voices when offline and falls back quietly if saved preference is unavailable', () => {
@@ -324,9 +329,9 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
       makeVoice('Reed', 'en-US'),
     ];
 
-    // Online picks Microsoft Natural first
+    // Online picks Google UK English Female first
     expect(selectBestDeviceVoice(voices, { online: true })?.name).toBe(
-      'Microsoft Ava Online (Natural) - English (United States)',
+      'Google UK English Female',
     );
 
     // Offline skips Online and Google voices -> picks Daniel
@@ -355,5 +360,146 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
     expect(getDeviceVoiceShortName('Reed (English (US))')).toBe('Reed');
     expect(getDeviceVoiceShortName('Samantha')).toBe('Samantha');
     expect(getDeviceVoiceShortName('Google US English')).toBe('Google US English');
+  });
+});
+
+describe('createBrowserDeviceVoiceProvider single-utterance & voiceschanged wait', () => {
+  function setupMockSpeechSynthesis(initialVoices: SpeechSynthesisVoice[]) {
+    let voices = initialVoices;
+    const spoken: Array<{ text: string; voice: SpeechSynthesisVoice | null; rate: number }> = [];
+    const listeners = new Map<string, Set<() => void>>();
+
+    class FakeUtterance {
+      text: string;
+      lang = 'en';
+      rate = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+
+    const pauseSpy = vi.fn();
+    const resumeSpy = vi.fn();
+    const cancelSpy = vi.fn();
+    const getVoicesSpy = vi.fn(() => voices);
+
+    const mockSynth = {
+      speaking: false,
+      pending: false,
+      paused: false,
+      getVoices: getVoicesSpy,
+      speak: vi.fn((utt: FakeUtterance) => {
+        spoken.push({ text: utt.text, voice: utt.voice, rate: utt.rate });
+        utt.onstart?.();
+      }),
+      cancel: cancelSpy,
+      pause: pauseSpy,
+      resume: resumeSpy,
+      addEventListener: vi.fn((event: string, cb: () => void) => {
+        if (!listeners.has(event)) listeners.set(event, new Set());
+        listeners.get(event)!.add(cb);
+      }),
+      removeEventListener: vi.fn((event: string, cb: () => void) => {
+        listeners.get(event)?.delete(cb);
+      }),
+    };
+
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      writable: true,
+      value: mockSynth,
+    });
+
+    return {
+      spoken,
+      mockSynth,
+      getVoicesSpy,
+      pauseSpy,
+      resumeSpy,
+      setVoicesAndNotify(nextVoices: SpeechSynthesisVoice[]) {
+        voices = nextVoices;
+        for (const cb of [...(listeners.get('voiceschanged') ?? [])]) {
+          cb();
+        }
+      },
+    };
+  }
+
+  it('sends the full description as ONE utterance with no sentence splits and no keepalive timer', () => {
+    vi.useFakeTimers();
+    const mock = setupMockSpeechSynthesis([
+      makeVoice('Google UK English Female', 'en-GB'),
+      makeVoice('Samantha', 'en-US'),
+    ]);
+
+    const provider = createBrowserDeviceVoiceProvider();
+    expect(mock.getVoicesSpy).toHaveBeenCalledTimes(1); // Preloaded at startup
+
+    const fullDescription =
+      'A clean, modern app icon showing two stylized sailboats on wavy water, set against a deep teal background, with a calm and friendly nautical feel.';
+
+    provider.speak(fullDescription, { rate: 1, online: true });
+
+    expect(mock.spoken).toHaveLength(1);
+    expect(mock.spoken[0].text).toBe(fullDescription);
+    expect(mock.spoken[0].voice?.name).toBe('Google UK English Female');
+
+    // Advancing timers long past 10-14 seconds must NEVER invoke pause/resume keepalive
+    vi.advanceTimersByTime(30_000);
+    expect(mock.pauseSpy).not.toHaveBeenCalled();
+    expect(mock.resumeSpy).not.toHaveBeenCalled();
+  });
+
+  it('waits for voiceschanged when getVoices() starts empty before choosing Google UK English Female', async () => {
+    const mock = setupMockSpeechSynthesis([]);
+    const provider = createBrowserDeviceVoiceProvider();
+    const onStart = vi.fn();
+
+    provider.speak('Two sailboats on wavy water.', {
+      rate: 1.1,
+      online: true,
+      onStart,
+    });
+
+    // Must wait rather than speaking immediately with null/default robotic voice
+    expect(mock.spoken).toHaveLength(0);
+    expect(onStart).not.toHaveBeenCalled();
+
+    // Simulate Chrome populating voices and firing voiceschanged
+    mock.setVoicesAndNotify([
+      makeVoice('Albert', 'en-US', true),
+      makeVoice('Samantha', 'en-US'),
+      makeVoice('Google UK English Female', 'en-GB'),
+    ]);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mock.spoken).toHaveLength(1);
+    expect(mock.spoken[0].text).toBe('Two sailboats on wavy water.');
+    expect(mock.spoken[0].voice?.name).toBe('Google UK English Female');
+    expect(onStart).toHaveBeenCalledWith('device');
+  });
+
+  it('falls back after 1.5s timeout if voiceschanged never arrives so speech does not hang', async () => {
+    vi.useFakeTimers();
+    const mock = setupMockSpeechSynthesis([]);
+    const provider = createBrowserDeviceVoiceProvider();
+
+    provider.speak('Fallback check.', { rate: 1, online: true });
+    expect(mock.spoken).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(VOICES_WAIT_TIMEOUT_MS - 1);
+    expect(mock.spoken).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mock.spoken).toHaveLength(1);
+    expect(mock.spoken[0].text).toBe('Fallback check.');
+    expect(mock.spoken[0].voice).toBeNull();
   });
 });
