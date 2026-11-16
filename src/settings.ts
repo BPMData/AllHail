@@ -9,6 +9,7 @@ export type AppSettings = {
   kokoroEnabledOnPhone: boolean;
   piperEnabledOnPhone: boolean;
   kokoroVoiceId: string;
+  disableEditing: boolean;
 };
 
 export const KOKORO_VOICES = [
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   kokoroEnabledOnPhone: false,
   piperEnabledOnPhone: false,
   kokoroVoiceId: 'af_heart',
+  disableEditing: false,
 };
 
 const STORAGE_KEY = 'allhail-settings-v1';
@@ -108,6 +110,10 @@ export function loadSettings(): AppSettings {
           ? parsed.piperEnabledOnPhone
           : DEFAULT_SETTINGS.piperEnabledOnPhone,
       kokoroVoiceId,
+      disableEditing:
+        typeof parsed.disableEditing === 'boolean'
+          ? parsed.disableEditing
+          : DEFAULT_SETTINGS.disableEditing,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

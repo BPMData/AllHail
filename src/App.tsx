@@ -7,9 +7,11 @@ import { HistoryView } from './components/HistoryView.tsx';
 import { InfoSettingsView } from './components/InfoSettingsView.tsx';
 import { KokoroBanner } from './components/KokoroBanner.tsx';
 import {
+  applyDescriptionEdit,
   clearHistory,
   deleteHistoryEntry,
   listHistoryEntries,
+  resetDescriptionToOriginal,
   saveHistoryEntry,
   type HistoryEntry,
 } from './historyStore.ts';
@@ -732,6 +734,67 @@ export function App({
     setStatusMessage(strings.statusStopped);
   };
 
+  const handleCopyText = async (text: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setStatusMessage(strings.copySuccessStatus);
+        return;
+      }
+      if (typeof document !== 'undefined') {
+        const helper = document.createElement('textarea');
+        helper.value = text;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        document.body.appendChild(helper);
+        helper.select();
+        const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
+        document.body.removeChild(helper);
+        if (copied) {
+          setStatusMessage(strings.copySuccessStatus);
+          return;
+        }
+      }
+      setStatusMessage(strings.copyFailedStatus);
+    } catch {
+      setStatusMessage(strings.copyFailedStatus);
+    }
+  };
+
+  const persistUpdatedEntry = async (updated: HistoryEntry) => {
+    setCurrentResult((prev) => (prev?.id === updated.id ? updated : prev));
+    await saveHistoryEntry(updated);
+    const stored = await listHistoryEntries();
+    if (stored.length > 0) {
+      setHistory(stored);
+    } else {
+      setHistory((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    }
+  };
+
+  const handleSaveEdit = async (id: string, nextText: string) => {
+    const target =
+      (currentResult?.id === id ? currentResult : undefined) ??
+      history.find((item) => item.id === id);
+    if (!target || !nextText.trim()) return;
+    runtime.coordinator.stop();
+    const updated = applyDescriptionEdit(target, nextText);
+    await persistUpdatedEntry(updated);
+    setStatusMessage(strings.editSavedStatus);
+  };
+
+  const handleResetOriginal = async (id: string) => {
+    const target =
+      (currentResult?.id === id ? currentResult : undefined) ??
+      history.find((item) => item.id === id);
+    if (!target) return;
+    runtime.coordinator.stop();
+    const restored = resetDescriptionToOriginal(target);
+    await persistUpdatedEntry(restored);
+    setStatusMessage(strings.editResetStatus);
+  };
+
   const handleDeleteHistory = async (id: string) => {
     await deleteHistoryEntry(id);
     setHistory(await listHistoryEntries());
@@ -844,6 +907,9 @@ export function App({
               }}
               onDescribePrepared={handleDescribePrepared}
               onDownloadMp3={(result) => void handleDownloadMp3(result)}
+              onCopyText={(text) => void handleCopyText(text)}
+              onSaveEdit={handleSaveEdit}
+              onResetOriginal={handleResetOriginal}
               onStatusAnnouncement={setStatusMessage}
               onTogglePause={handleTogglePause}
               onPlayResult={(text) => speakText(text)}
@@ -866,6 +932,7 @@ export function App({
                 setCurrentResult(entry);
                 setActiveTab('camera');
               }}
+              onCopyText={(text) => void handleCopyText(text)}
               onDownloadMp3={(entry) => void handleDownloadMp3(entry)}
               onDeleteEntry={(id) => void handleDeleteHistory(id)}
               onClearAll={() => void handleClearHistory()}

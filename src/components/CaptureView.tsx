@@ -10,6 +10,7 @@ export type DescriptionResult = {
   mode: PromptMode;
   model: string;
   text: string;
+  originalText?: string;
   sourceName?: string;
   thumbnailDataUrl?: string;
   createdAt: number;
@@ -30,6 +31,9 @@ type CaptureViewProps = {
   onPreparedPhoto: (photo: PreparedPhoto, sourceName?: string) => void;
   onDescribePrepared: (photo: PreparedPhoto, mode: PromptMode, sourceName?: string) => Promise<void>;
   onDownloadMp3?: (result: DescriptionResult) => void;
+  onCopyText?: (text: string) => void;
+  onSaveEdit?: (id: string, nextText: string) => Promise<void> | void;
+  onResetOriginal?: (id: string) => Promise<void> | void;
   onStatusAnnouncement: (message: string) => void;
   onTogglePause: () => void;
   onPlayResult: (text: string) => void;
@@ -53,6 +57,9 @@ export function CaptureView({
   onPreparedPhoto,
   onDescribePrepared,
   onDownloadMp3,
+  onCopyText,
+  onSaveEdit,
+  onResetOriginal,
   onStatusAnnouncement,
   onTogglePause,
   onPlayResult,
@@ -65,11 +72,20 @@ export function CaptureView({
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const [viewfinderOpen, setViewfinderOpen] = useState(false);
   const [viewfinderReady, setViewfinderReady] = useState(false);
   const [viewfinderMessage, setViewfinderMessage] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<PromptMode>('describe');
+  const [editing, setEditing] = useState(false);
+  const [draftText, setDraftText] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditing(false);
+    setEditError(null);
+  }, [currentResult?.id, settings.disableEditing]);
 
   useEffect(() => {
     return () => {
@@ -208,8 +224,51 @@ export function CaptureView({
     }
   };
 
+  const handleStartEdit = () => {
+    if (!currentResult || settings.disableEditing) return;
+    if (speechStatus.speaking) {
+      onStopSpeech();
+    }
+    setDraftText(currentResult.text);
+    setEditError(null);
+    setEditing(true);
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+    });
+  };
+
+  const handleSaveEditClick = async () => {
+    if (!currentResult || !onSaveEdit) return;
+    if (!draftText.trim()) {
+      setEditError(strings.editEmptyError);
+      onStatusAnnouncement(strings.editEmptyError);
+      editorRef.current?.focus();
+      return;
+    }
+    setEditError(null);
+    await onSaveEdit(currentResult.id, draftText);
+    setEditing(false);
+  };
+
+  const handleCancelEditClick = () => {
+    setEditError(null);
+    setEditing(false);
+  };
+
+  const handleResetOriginalClick = async () => {
+    if (!currentResult || !onResetOriginal) return;
+    setEditError(null);
+    await onResetOriginal(currentResult.id);
+    setEditing(false);
+  };
+
   const activeModeLabel =
     currentResult?.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
+
+  const isEdited = Boolean(
+    currentResult?.originalText && currentResult.originalText !== currentResult.text,
+  );
+  const editingActive = editing && !settings.disableEditing;
 
   const displayedProvider = speechStatus.activeProvider ?? lastVoiceUsed;
   const activeVoiceLabel =
@@ -404,84 +463,171 @@ export function CaptureView({
               <p className="text-sm font-semibold opacity-80">
                 {activeModeLabel}
                 {activeVoiceLabel ? ` · ${activeVoiceLabel}` : ''}
+                {isEdited ? ` · ${strings.editedTag}` : ''}
               </p>
             )}
           </div>
 
           {currentResult ? (
             <>
-              {/* Tap anywhere on the description card to pause/resume or play */}
-              <button
-                type="button"
-                aria-label={strings.readerTapToPause}
-                aria-pressed={speechStatus.speaking && !speechStatus.paused}
-                onClick={handleReaderCardClick}
-                className="reader-surface mt-4 block w-full rounded-2xl border-2 p-4 text-left text-xl leading-relaxed whitespace-pre-wrap"
-              >
-                {currentResult.text}
-              </button>
-
-              <p className="mt-3 text-sm opacity-75">
-                {strings.describedWith} {currentResult.model}
-              </p>
-
-              {/* Explicit playback buttons — never speak "Describing" */}
-              <div className="mt-4 flex flex-wrap gap-3">
-                {speechStatus.speaking ? (
-                  <button
-                    type="button"
-                    onClick={onTogglePause}
-                    className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
-                  >
-                    {speechStatus.paused ? strings.resumeSpeech : strings.pauseSpeech}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onUnlockPlayback();
-                      onPlayResult(currentResult.text);
+              {editingActive ? (
+                <div className="mt-4 space-y-3">
+                  <label htmlFor="description-editor" className="block text-base font-bold">
+                    {strings.editTextareaLabel}
+                  </label>
+                  <textarea
+                    id="description-editor"
+                    ref={editorRef}
+                    rows={6}
+                    value={draftText}
+                    onChange={(e) => {
+                      setDraftText(e.target.value);
+                      if (editError && e.target.value.trim()) {
+                        setEditError(null);
+                      }
                     }}
-                    className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
-                  >
-                    {strings.playAloud}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onUnlockPlayback();
-                    onRepeat();
-                  }}
-                  className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
-                >
-                  {strings.repeatSpeech}
-                </button>
-
-                {speechStatus.speaking && (
+                    className="reader-surface block min-h-[160px] w-full rounded-2xl border-2 p-4 text-xl leading-relaxed"
+                  />
+                  {editError && (
+                    <p role="alert" className="text-sm font-bold">
+                      {editError}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveEditClick()}
+                      className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
+                    >
+                      {strings.saveChanges}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEditClick}
+                      className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                    >
+                      {strings.cancelEdit}
+                    </button>
+                    {(isEdited ||
+                      draftText.trim() !==
+                        (currentResult.originalText ?? currentResult.text).trim()) &&
+                      onResetOriginal && (
+                        <button
+                          type="button"
+                          onClick={() => void handleResetOriginalClick()}
+                          className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                        >
+                          {strings.resetToOriginal}
+                        </button>
+                      )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Tap anywhere on the description card to pause/resume or play */}
                   <button
                     type="button"
-                    onClick={onStopSpeech}
-                    className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                    aria-label={strings.readerTapToPause}
+                    aria-pressed={speechStatus.speaking && !speechStatus.paused}
+                    onClick={handleReaderCardClick}
+                    className="reader-surface mt-4 block w-full rounded-2xl border-2 p-4 text-left text-xl leading-relaxed whitespace-pre-wrap"
                   >
-                    {strings.stopSpeech}
+                    {currentResult.text}
                   </button>
-                )}
 
-                {onDownloadMp3 && (
-                  <button
-                    type="button"
-                    disabled={mp3Busy}
-                    aria-busy={mp3Busy}
-                    data-testid="download-mp3-button"
-                    onClick={() => onDownloadMp3(currentResult)}
-                    className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold disabled:opacity-60"
-                  >
-                    {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
-                  </button>
-                )}
-              </div>
+                  <p className="mt-3 text-sm opacity-75">
+                    {strings.describedWith} {currentResult.model}
+                  </p>
+
+                  {/* Explicit playback, copy, MP3, and optional edit controls */}
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {speechStatus.speaking ? (
+                      <button
+                        type="button"
+                        onClick={onTogglePause}
+                        className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
+                      >
+                        {speechStatus.paused ? strings.resumeSpeech : strings.pauseSpeech}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onUnlockPlayback();
+                          onPlayResult(currentResult.text);
+                        }}
+                        className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
+                      >
+                        {strings.playAloud}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUnlockPlayback();
+                        onRepeat();
+                      }}
+                      className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                    >
+                      {strings.repeatSpeech}
+                    </button>
+
+                    {speechStatus.speaking && (
+                      <button
+                        type="button"
+                        onClick={onStopSpeech}
+                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                      >
+                        {strings.stopSpeech}
+                      </button>
+                    )}
+
+                    {onCopyText && (
+                      <button
+                        type="button"
+                        onClick={() => onCopyText(currentResult.text)}
+                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                      >
+                        {strings.copyText}
+                      </button>
+                    )}
+
+                    {onDownloadMp3 && (
+                      <button
+                        type="button"
+                        disabled={mp3Busy}
+                        aria-busy={mp3Busy}
+                        data-testid="download-mp3-button"
+                        onClick={() => onDownloadMp3(currentResult)}
+                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold disabled:opacity-60"
+                      >
+                        {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
+                      </button>
+                    )}
+
+                    {!settings.disableEditing && onSaveEdit && (
+                      <button
+                        type="button"
+                        onClick={handleStartEdit}
+                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                      >
+                        {strings.editDescription}
+                      </button>
+                    )}
+
+                    {!settings.disableEditing && isEdited && onResetOriginal && (
+                      <button
+                        type="button"
+                        onClick={() => void handleResetOriginalClick()}
+                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                      >
+                        {strings.resetToOriginal}
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <p className="mt-4 text-lg opacity-80">{strings.readerEmpty}</p>

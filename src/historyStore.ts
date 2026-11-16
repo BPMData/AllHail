@@ -6,6 +6,7 @@ export type HistoryEntry = {
   mode: PromptMode;
   model: string;
   text: string;
+  originalText?: string;
   sourceName?: string;
   thumbnailDataUrl?: string;
 };
@@ -121,4 +122,35 @@ export async function clearHistory(): Promise<void> {
   } catch {
     // Ignore storage failures gracefully.
   }
+}
+
+export function applyDescriptionEdit<T extends { text: string; originalText?: string }>(
+  entry: T,
+  nextText: string,
+): T {
+  const trimmed = nextText.trim();
+  if (!trimmed) return entry;
+  const baseOriginal = entry.originalText ?? entry.text;
+  if (trimmed === baseOriginal.trim()) {
+    const rest = { ...entry };
+    delete rest.originalText;
+    return { ...rest, text: baseOriginal };
+  }
+  return {
+    ...entry,
+    text: trimmed,
+    originalText: baseOriginal,
+  };
+}
+
+export function resetDescriptionToOriginal<T extends { text: string; originalText?: string }>(
+  entry: T,
+): T {
+  if (!entry.originalText) return entry;
+  const rest = { ...entry };
+  delete rest.originalText;
+  return {
+    ...rest,
+    text: entry.originalText,
+  };
 }

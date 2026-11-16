@@ -161,6 +161,22 @@ export function InfoSettingsView({
           </label>
         </div>
 
+        {/* Disable description editing checkbox */}
+        <div className="mt-5 border-b pb-5">
+          <label className="flex min-h-[48px] cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={settings.disableEditing}
+              onChange={(e) => onUpdateSettings({ disableEditing: e.target.checked })}
+              className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+            />
+            <span>
+              <span className="block text-lg font-bold">{strings.disableEditingLabel}</span>
+              <span className="mt-1 block text-base opacity-85">{strings.disableEditingHint}</span>
+            </span>
+          </label>
+        </div>
+
         {/* Speech speed */}
         <div className="mt-5 border-b pb-5">
           <p className="text-lg font-bold">{strings.speedLabel}</p>

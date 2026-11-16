@@ -7,6 +7,7 @@ type HistoryViewProps = {
   mp3Busy?: boolean;
   onPlayEntry: (entry: HistoryEntry) => void;
   onOpenEntry: (entry: HistoryEntry) => void;
+  onCopyText?: (text: string) => void;
   onDownloadMp3?: (entry: HistoryEntry) => void;
   onDeleteEntry: (id: string) => void;
   onClearAll: () => void;
@@ -17,6 +18,7 @@ export function HistoryView({
   mp3Busy = false,
   onPlayEntry,
   onOpenEntry,
+  onCopyText,
   onDownloadMp3,
   onDeleteEntry,
   onClearAll,
@@ -84,6 +86,7 @@ export function HistoryView({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold opacity-80">
                       {modeLabel} · {dateText}
+                      {entry.originalText && entry.originalText !== entry.text ? ` · ${strings.editedTag}` : ''}
                     </p>
                     <p className="mt-2 text-lg leading-relaxed">{previewText}</p>
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -101,6 +104,15 @@ export function HistoryView({
                       >
                         {strings.historyOpen}
                       </button>
+                      {onCopyText && (
+                        <button
+                          type="button"
+                          onClick={() => onCopyText(entry.text)}
+                          className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                        >
+                          {strings.copyText}
+                        </button>
+                      )}
                       {onDownloadMp3 && (
                         <button
                           type="button"

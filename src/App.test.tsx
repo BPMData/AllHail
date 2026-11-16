@@ -4,6 +4,7 @@ import { strings } from '../shared/strings.ts';
 import { App } from './App.tsx';
 import * as historyStore from './historyStore.ts';
 import * as imagePrep from './imagePrep.ts';
+import { loadSettings } from './settings.ts';
 import { KokoroBrowserClient } from './speech/kokoroClient.ts';
 import { PIPER_TOTAL_SIZE_MB } from './speech/piperAssets.ts';
 import { PiperBrowserClient } from './speech/piperClient.ts';
@@ -837,5 +838,155 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       });
       vi.unstubAllGlobals();
     }
+  });
+
+  it('supports editing descriptions, copying original/edited text, syncing History, resetting to original, and disabling editing persistently', async () => {
+    const savedEntries: historyStore.HistoryEntry[] = [];
+    vi.spyOn(historyStore, 'saveHistoryEntry').mockImplementation(async (entry) => {
+      const idx = savedEntries.findIndex((item) => item.id === entry.id);
+      if (idx >= 0) {
+        savedEntries[idx] = entry;
+      } else {
+        savedEntries.unshift(entry);
+      }
+    });
+    vi.spyOn(historyStore, 'listHistoryEntries').mockImplementation(async () => [...savedEntries]);
+
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+
+    const fetchMock = vi.fn().mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            text: 'Original worksheet description with typo.',
+            model: 'anthropic/claude-haiku-5.5',
+            mode: 'describe',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    const runtime1 = makeTestRuntime();
+    render(
+      <App
+        coordinator={runtime1.coordinator}
+        kokoroClient={runtime1.kokoroClient}
+        piperClient={runtime1.piperClient}
+        deviceClassOverride="laptop"
+        hasWebGpuAdapterOverride={async () => false}
+      />,
+    );
+
+    const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(galleryInput, {
+        target: { files: [new File(['photo'], 'worksheet.png', { type: 'image/png' })] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Original worksheet description with typo.')).toBeDefined();
+    });
+
+    // Copy original text right away
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.copyText }));
+    });
+    expect(writeText).toHaveBeenLastCalledWith('Original worksheet description with typo.');
+    expect(screen.getByRole('status').textContent).toContain(strings.copySuccessStatus);
+
+    // Edit description -> validate blank -> save valid revision
+    fireEvent.click(screen.getByRole('button', { name: strings.editDescription }));
+    const editor = screen.getByLabelText(strings.editTextareaLabel) as HTMLTextAreaElement;
+    expect(editor.value).toBe('Original worksheet description with typo.');
+
+    fireEvent.change(editor, { target: { value: '   ' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.saveChanges }));
+    });
+    expect(screen.getByRole('alert').textContent).toBe(strings.editEmptyError);
+
+    fireEvent.change(editor, { target: { value: 'Corrected worksheet description for Schoology.' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.saveChanges }));
+    });
+
+    expect(screen.getByText('Corrected worksheet description for Schoology.')).toBeDefined();
+    expect(screen.getByRole('status').textContent).toContain(strings.editSavedStatus);
+
+    // Speech & Copy text use the updated text
+    fireEvent.click(screen.getByRole('button', { name: strings.playAloud }));
+    expect(runtime1.spokenTexts.at(-1)).toBe('Corrected worksheet description for Schoology.');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.copyText }));
+    });
+    expect(writeText).toHaveBeenLastCalledWith('Corrected worksheet description for Schoology.');
+
+    // History synced with Edited tag and updated text
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabHistory })[0]);
+    expect(screen.getByText('Corrected worksheet description for Schoology.')).toBeDefined();
+    expect(screen.getByText(new RegExp(strings.editedTag))).toBeDefined();
+
+    // Return to Camera and Reset to original
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.resetToOriginal }));
+    });
+    expect(screen.getByText('Original worksheet description with typo.')).toBeDefined();
+    expect(screen.getByRole('status').textContent).toContain(strings.editResetStatus);
+    expect(screen.queryByRole('button', { name: strings.resetToOriginal })).toBeNull();
+
+    // Enable Disable description editing in Settings -> persists and hides Edit button while keeping Copy text & tap-to-pause
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    const disableToggle = screen.getByLabelText(new RegExp(strings.disableEditingLabel)) as HTMLInputElement;
+    expect(disableToggle.checked).toBe(false);
+    fireEvent.click(disableToggle);
+    expect(disableToggle.checked).toBe(true);
+    expect(loadSettings().disableEditing).toBe(true);
+
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
+    expect(screen.queryByRole('button', { name: strings.editDescription })).toBeNull();
+    expect(screen.getByRole('button', { name: strings.readerTapToPause })).toBeDefined();
+    expect(screen.getByRole('button', { name: strings.copyText })).toBeDefined();
+
+    // Re-mounting the app (simulating reopening after closing) preserves disableEditing = true
+    cleanup();
+    const runtime2 = makeTestRuntime();
+    render(
+      <App
+        coordinator={runtime2.coordinator}
+        kokoroClient={runtime2.kokoroClient}
+        piperClient={runtime2.piperClient}
+        deviceClassOverride="laptop"
+        hasWebGpuAdapterOverride={async () => false}
+      />,
+    );
+
+    const galleryInput2 = screen.getByTestId('gallery-input') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(galleryInput2, {
+        target: { files: [new File(['photo'], 'worksheet2.png', { type: 'image/png' })] },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: strings.copyText })).toBeDefined();
+    });
+    expect(screen.queryByRole('button', { name: strings.editDescription })).toBeNull();
+
+    vi.unstubAllGlobals();
   });
 });
