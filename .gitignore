@@ -20,3 +20,6 @@ sample_images/
 
 # AI Studio does not keep a lock file here; CI installs from package.json (see .github/workflows/ci.yml)
 package-lock.json
+
+# Deep-research reports: kept locally, not committed
+research_outputs/
