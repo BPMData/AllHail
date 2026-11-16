@@ -1,4 +1,4 @@
-import type { DeviceClass } from '../settings.ts';
+import type { DeviceClass, VoiceOrderPreference } from '../settings.ts';
 import type { KokoroState } from './kokoroClient.ts';
 import type { PiperState } from './piperClient.ts';
 
@@ -27,6 +27,7 @@ export async function probeWebGpuAdapter(): Promise<boolean> {
 
 /**
  * Decides Kokoro vs Piper BEFORE downloading anything on laptops:
+ * - If user selected `piper-first`, download Piper right away.
  * - No WebGPU adapter -> skip Kokoro completely (~330 MB saved) and start Piper.
  * - Adapter present -> download Kokoro (webgpu/fp32). If Kokoro fails or calibrates
  *   too slow, automatically start Piper.
@@ -35,6 +36,7 @@ export async function probeWebGpuAdapter(): Promise<boolean> {
 export async function coordinateOfflineVoiceStartup({
   online,
   deviceClass,
+  voiceOrder = 'auto',
   kokoroEnabledOnPhone,
   piperEnabledOnPhone,
   hasWebGpuAdapter = probeWebGpuAdapter,
@@ -43,6 +45,7 @@ export async function coordinateOfflineVoiceStartup({
 }: {
   online: boolean;
   deviceClass: DeviceClass;
+  voiceOrder?: VoiceOrderPreference;
   kokoroEnabledOnPhone: boolean;
   piperEnabledOnPhone: boolean;
   hasWebGpuAdapter?: () => Promise<boolean>;
@@ -61,7 +64,16 @@ export async function coordinateOfflineVoiceStartup({
     return;
   }
 
-  // Laptop startup path
+  // If a laptop user explicitly prioritizes Piper, prepare Piper immediately without
+  // gating on WebGPU or downloading Kokoro first.
+  if (voiceOrder === 'piper-first') {
+    if (piper.getState().status === 'idle') {
+      piper.startDownload();
+    }
+    return;
+  }
+
+  // Laptop default startup path
   const kokoroStatus = kokoro.getState().status;
   if (kokoroStatus === 'idle') {
     const hasGpu = await hasWebGpuAdapter().catch(() => false);

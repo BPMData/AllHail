@@ -27,6 +27,7 @@ type InfoSettingsViewProps = {
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onSelectDeviceVoice: (voiceName: string | null) => void;
   onSelectKokoroVoice: (voiceId: string) => void;
+  onDownloadPiper?: () => void;
   onPreviewPiper: () => void;
   onRetryKokoro: () => void;
   onRetryPiper: () => void;
@@ -50,6 +51,7 @@ export function InfoSettingsView({
   onUpdateSettings,
   onSelectDeviceVoice,
   onSelectKokoroVoice,
+  onDownloadPiper,
   onPreviewPiper,
   onRetryKokoro,
   onRetryPiper,
@@ -338,6 +340,16 @@ export function InfoSettingsView({
           )}
 
           <div className="flex flex-wrap items-center gap-3">
+            {deviceClass === 'laptop' && piperState.status === 'idle' && onDownloadPiper && (
+              <button
+                type="button"
+                onClick={onDownloadPiper}
+                className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+              >
+                {strings.piperDownloadButtonTemplate.replace('{size}', piperSizeText)}
+              </button>
+            )}
+
             {piperState.status === 'error' && (
               <button
                 type="button"

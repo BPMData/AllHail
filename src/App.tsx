@@ -152,6 +152,7 @@ export function App({
   const savedSeqRef = useRef(0);
   const kokoroAnnounceStageRef = useRef<'none' | 'start' | 'half' | 'done'>('none');
   const piperAnnounceStageRef = useRef<'none' | 'start' | 'half' | 'done'>('none');
+  const pendingPiperPreviewRef = useRef(false);
 
   const reloadOnce = () => {
     if (!reloading.current) {
@@ -264,6 +265,7 @@ export function App({
     void coordinateOfflineVoiceStartup({
       online,
       deviceClass,
+      voiceOrder: settings.voiceOrder,
       kokoroEnabledOnPhone: settings.kokoroEnabledOnPhone,
       piperEnabledOnPhone: settings.piperEnabledOnPhone,
       hasWebGpuAdapter: hasWebGpuAdapterOverride ?? probeWebGpuAdapter,
@@ -273,6 +275,7 @@ export function App({
   }, [
     online,
     deviceClass,
+    settings.voiceOrder,
     settings.kokoroEnabledOnPhone,
     settings.piperEnabledOnPhone,
     kokoroState.status,
@@ -452,19 +455,7 @@ export function App({
     });
   };
 
-  const handlePreviewPiper = () => {
-    if (piperState.status === 'unavailable') {
-      setPiperPreviewMessage(strings.piperPreviewUnavailable);
-      triggerSavedFeedback(strings.piperPreviewUnavailable);
-      return;
-    }
-    const piperReady = piperAllowed && runtime.piper.isReady();
-    if (!piperReady) {
-      setPiperPreviewMessage(strings.piperPreviewNotReady);
-      triggerSavedFeedback(strings.piperPreviewNotReady);
-      return;
-    }
-
+  const playPiperPreviewNow = () => {
     setPiperPreviewMessage(null);
     runtime.coordinator.unlockAudioOnly();
     runtime.coordinator.speakJob(strings.piperPreviewText, {
@@ -476,6 +467,83 @@ export function App({
       piperTooSlow: false,
       forceProvider: 'piper',
     });
+  };
+
+  useEffect(() => {
+    if (!pendingPiperPreviewRef.current) return;
+    if (piperState.status === 'ready' && piperAllowed) {
+      pendingPiperPreviewRef.current = false;
+      setPiperPreviewMessage(null);
+      if (activeTab === 'info') {
+        playPiperPreviewNow();
+      }
+      return;
+    }
+    if (piperState.status === 'error' || piperState.status === 'unavailable' || !piperAllowed) {
+      pendingPiperPreviewRef.current = false;
+      setPiperPreviewMessage(
+        piperState.status === 'unavailable' ? strings.piperPreviewUnavailable : strings.piperStatusError,
+      );
+    }
+  }, [piperState.status, piperAllowed, activeTab]);
+
+  const handleDownloadPiper = () => {
+    if (piperState.status === 'unavailable') {
+      setPiperPreviewMessage(strings.piperPreviewUnavailable);
+      triggerSavedFeedback(strings.piperPreviewUnavailable);
+      return;
+    }
+    if (!online) {
+      const waitMsg = strings.piperStatusWaitingOnlineTemplate.replace('{size}', String(piperState.sizeMb));
+      setPiperPreviewMessage(waitMsg);
+      triggerSavedFeedback(waitMsg);
+      return;
+    }
+    setPiperPreviewMessage(null);
+    if (piperState.status === 'error') {
+      runtime.piper.retryDownload();
+    } else if (piperState.status === 'idle') {
+      runtime.piper.startDownload();
+    }
+    triggerSavedFeedback(strings.piperAnnounceStart);
+  };
+
+  const handlePreviewPiper = () => {
+    if (piperState.status === 'unavailable') {
+      pendingPiperPreviewRef.current = false;
+      setPiperPreviewMessage(strings.piperPreviewUnavailable);
+      triggerSavedFeedback(strings.piperPreviewUnavailable);
+      return;
+    }
+    if (deviceClass === 'phone' && !settings.piperEnabledOnPhone) {
+      pendingPiperPreviewRef.current = false;
+      setPiperPreviewMessage(strings.piperPreviewPhoneOff);
+      triggerSavedFeedback(strings.piperPreviewPhoneOff);
+      return;
+    }
+    const piperReady = piperAllowed && runtime.piper.isReady();
+    if (piperReady) {
+      pendingPiperPreviewRef.current = false;
+      playPiperPreviewNow();
+      return;
+    }
+    if (!online) {
+      pendingPiperPreviewRef.current = false;
+      const waitMsg = strings.piperStatusWaitingOnlineTemplate.replace('{size}', String(piperState.sizeMb));
+      setPiperPreviewMessage(waitMsg);
+      triggerSavedFeedback(waitMsg);
+      return;
+    }
+
+    runtime.coordinator.unlockAudioOnly();
+    pendingPiperPreviewRef.current = true;
+    if (piperState.status === 'idle') {
+      runtime.piper.startDownload();
+    } else if (piperState.status === 'error') {
+      runtime.piper.retryDownload();
+    }
+    setPiperPreviewMessage(strings.piperPreviewNotReady);
+    triggerSavedFeedback(strings.piperPreviewNotReady);
   };
 
   const handleUnlockCapture = () => {
@@ -822,6 +890,7 @@ export function App({
               onUpdateSettings={updateSettings}
               onSelectDeviceVoice={handleSelectDeviceVoice}
               onSelectKokoroVoice={handleSelectKokoroVoice}
+              onDownloadPiper={handleDownloadPiper}
               onPreviewPiper={handlePreviewPiper}
               onRetryKokoro={() => runtime.kokoro.retryDownload()}
               onRetryPiper={() => runtime.piper.retryDownload()}

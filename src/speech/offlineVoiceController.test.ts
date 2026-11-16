@@ -140,4 +140,22 @@ describe('coordinateOfflineVoiceStartup (pre-download WebGPU probe)', () => {
     expect(kokoro.startDownload).not.toHaveBeenCalled();
     expect(piper.startDownload).toHaveBeenCalledTimes(1);
   });
+
+  it('starts Piper immediately on laptops when voiceOrder is set to piper-first even with WebGPU', async () => {
+    const { kokoro, piper } = makeTargets();
+
+    await coordinateOfflineVoiceStartup({
+      online: true,
+      deviceClass: 'laptop',
+      voiceOrder: 'piper-first',
+      kokoroEnabledOnPhone: false,
+      piperEnabledOnPhone: false,
+      hasWebGpuAdapter: async () => true,
+      kokoro,
+      piper,
+    });
+
+    expect(piper.startDownload).toHaveBeenCalledTimes(1);
+    expect(kokoro.startDownload).not.toHaveBeenCalled();
+  });
 });

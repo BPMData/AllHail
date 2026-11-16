@@ -443,9 +443,17 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(piperRetryDownloadSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('shows Saved feedback, active voice switch, Piper preview & private-browsing notice, and Kokoro tooSlow notice', async () => {
-    const { coordinator, kokoroClient, piperClient, playClickSound, kokoroSpokenTexts, piperSpokenTexts, spokenTexts } =
-      makeTestRuntime();
+  it('shows Saved feedback, active voice switch, Piper download/preview on WebGPU laptops, and Kokoro tooSlow notice', async () => {
+    const {
+      coordinator,
+      kokoroClient,
+      piperClient,
+      piperStartDownloadSpy,
+      playClickSound,
+      kokoroSpokenTexts,
+      piperSpokenTexts,
+      spokenTexts,
+    } = makeTestRuntime();
     render(
       <App
         coordinator={coordinator}
@@ -463,13 +471,20 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(playClickSound).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('settings-saved-badge').textContent).toContain(strings.settingsSaved);
 
-    // Clicking Preview Piper while downloading waits quietly without using device voice
+    // Explicit Download Piper button is available on WebGPU laptops while Piper is in standby
+    const downloadPiperBtn = screen.getByRole('button', {
+      name: strings.piperDownloadButtonTemplate.replace('{size}', String(PIPER_TOTAL_SIZE_MB)),
+    });
+    expect(downloadPiperBtn).toBeDefined();
+
+    // Clicking Preview Piper while idle starts downloading Piper and waits quietly without using device voice
     fireEvent.click(screen.getByRole('button', { name: strings.piperPreviewButton }));
+    expect(piperStartDownloadSpy).toHaveBeenCalledTimes(1);
     expect(spokenTexts).toEqual([]);
     expect(piperSpokenTexts).toEqual([]);
     expect(screen.getByTestId('piper-preview-note').textContent).toBe(strings.piperPreviewNotReady);
 
-    // Mark Kokoro tooSlow and Piper ready -> Active voice becomes Piper and Preview Piper speaks in Piper
+    // Mark Kokoro tooSlow and Piper ready -> Active voice becomes Piper and pending Piper preview auto-plays
     act(() => {
       kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: true, startedAt: null });
       piperClient.setExternalState({ status: 'ready', progress: 100, tooSlow: false, startedAt: null });
@@ -479,9 +494,11 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByTestId('active-voice-status').textContent).toBe(
       `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`,
     );
-
-    fireEvent.click(screen.getByRole('button', { name: strings.piperPreviewButton }));
     expect(piperSpokenTexts).toEqual([strings.piperPreviewText]);
+
+    // Explicit Preview click when already ready speaks immediately too
+    fireEvent.click(screen.getByRole('button', { name: strings.piperPreviewButton }));
+    expect(piperSpokenTexts).toEqual([strings.piperPreviewText, strings.piperPreviewText]);
 
     // When Kokoro is ready and fast, Active voice switches to Kokoro
     act(() => {
@@ -499,6 +516,13 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         voice: 'am_michael',
       },
     ]);
+
+    // Switching Preferred voice order to piper-first switches Active voice back to Piper
+    const orderSelect = screen.getByLabelText(strings.voiceOrderLabel) as HTMLSelectElement;
+    fireEvent.change(orderSelect, { target: { value: 'piper-first' } });
+    expect(screen.getByTestId('active-voice-status').textContent).toBe(
+      `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`,
+    );
   });
 
   it('supports Device voice picker, immediate short-name preview, missing-voice fallback, and matching Describing cue voice', () => {
