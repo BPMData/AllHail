@@ -12,6 +12,7 @@ import {
   deleteHistoryEntry,
   listHistoryEntries,
   resetDescriptionToOriginal,
+  restoreStashedEdit,
   saveHistoryEntry,
   type HistoryEntry,
 } from './historyStore.ts';
@@ -784,15 +785,30 @@ export function App({
     setStatusMessage(strings.editSavedStatus);
   };
 
-  const handleResetOriginal = async (id: string) => {
+  const handleResetOriginal = async (id: string, draftOverride?: string) => {
     const target =
       (currentResult?.id === id ? currentResult : undefined) ??
       history.find((item) => item.id === id);
     if (!target) return;
     runtime.coordinator.stop();
-    const restored = resetDescriptionToOriginal(target);
+    const withDraft =
+      draftOverride && draftOverride.trim() && target.originalText
+        ? { ...target, text: draftOverride.trim() }
+        : target;
+    const restored = resetDescriptionToOriginal(withDraft);
     await persistUpdatedEntry(restored);
     setStatusMessage(strings.editResetStatus);
+  };
+
+  const handleRestoreStashedEdit = async (id: string) => {
+    const target =
+      (currentResult?.id === id ? currentResult : undefined) ??
+      history.find((item) => item.id === id);
+    if (!target || !target.stashedEditedText) return;
+    runtime.coordinator.stop();
+    const restoredEdit = restoreStashedEdit(target);
+    await persistUpdatedEntry(restoredEdit);
+    setStatusMessage(strings.editBroughtBackStatus);
   };
 
   const handleDeleteHistory = async (id: string) => {
@@ -910,6 +926,7 @@ export function App({
               onCopyText={(text) => void handleCopyText(text)}
               onSaveEdit={handleSaveEdit}
               onResetOriginal={handleResetOriginal}
+              onRestoreStashedEdit={handleRestoreStashedEdit}
               onStatusAnnouncement={setStatusMessage}
               onTogglePause={handleTogglePause}
               onPlayResult={(text) => speakText(text)}

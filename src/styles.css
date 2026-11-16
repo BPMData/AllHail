@@ -70,6 +70,12 @@ button {
   border-color: #153f35;
 }
 
+.danger-button {
+  color: #ffffff;
+  background: #b91c1c;
+  border-color: #991b1b;
+}
+
 progress.kokoro-progress {
   appearance: none;
   -webkit-appearance: none;
@@ -174,6 +180,12 @@ progress.kokoro-progress::-moz-progress-bar {
     color: #eef5ed;
     background: #224438;
     border-color: #c6e4cb;
+  }
+
+  .danger-button {
+    color: #ffffff;
+    background: #b91c1c;
+    border-color: #fca5a5;
   }
 
   progress.kokoro-progress {

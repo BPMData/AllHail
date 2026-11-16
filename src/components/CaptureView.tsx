@@ -11,6 +11,7 @@ export type DescriptionResult = {
   model: string;
   text: string;
   originalText?: string;
+  stashedEditedText?: string;
   sourceName?: string;
   thumbnailDataUrl?: string;
   createdAt: number;
@@ -33,7 +34,8 @@ type CaptureViewProps = {
   onDownloadMp3?: (result: DescriptionResult) => void;
   onCopyText?: (text: string) => void;
   onSaveEdit?: (id: string, nextText: string) => Promise<void> | void;
-  onResetOriginal?: (id: string) => Promise<void> | void;
+  onResetOriginal?: (id: string, draftOverride?: string) => Promise<void> | void;
+  onRestoreStashedEdit?: (id: string) => Promise<void> | void;
   onStatusAnnouncement: (message: string) => void;
   onTogglePause: () => void;
   onPlayResult: (text: string) => void;
@@ -60,6 +62,7 @@ export function CaptureView({
   onCopyText,
   onSaveEdit,
   onResetOriginal,
+  onRestoreStashedEdit,
   onStatusAnnouncement,
   onTogglePause,
   onPlayResult,
@@ -81,10 +84,14 @@ export function CaptureView({
   const [editing, setEditing] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [stashedUnsavedDraft, setStashedUnsavedDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setEditing(false);
     setEditError(null);
+    setConfirmReset(false);
+    setStashedUnsavedDraft(null);
   }, [currentResult?.id, settings.disableEditing]);
 
   useEffect(() => {
@@ -231,6 +238,8 @@ export function CaptureView({
     }
     setDraftText(currentResult.text);
     setEditError(null);
+    setConfirmReset(false);
+    setStashedUnsavedDraft(null);
     setEditing(true);
     requestAnimationFrame(() => {
       editorRef.current?.focus();
@@ -246,20 +255,62 @@ export function CaptureView({
       return;
     }
     setEditError(null);
+    setConfirmReset(false);
+    setStashedUnsavedDraft(null);
     await onSaveEdit(currentResult.id, draftText);
     setEditing(false);
   };
 
   const handleCancelEditClick = () => {
     setEditError(null);
+    setConfirmReset(false);
+    setStashedUnsavedDraft(null);
     setEditing(false);
   };
 
-  const handleResetOriginalClick = async () => {
-    if (!currentResult || !onResetOriginal) return;
+  const handleResetOriginalClick = async (fromEditMode: boolean) => {
+    if (!currentResult) return;
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
+    }
     setEditError(null);
-    await onResetOriginal(currentResult.id);
-    setEditing(false);
+    setConfirmReset(false);
+    const originalBase = currentResult.originalText ?? currentResult.text;
+
+    if (fromEditMode) {
+      if (isEdited && onResetOriginal) {
+        const draftToStash = draftText.trim() ? draftText.trim() : undefined;
+        await onResetOriginal(currentResult.id, draftToStash);
+        setDraftText(originalBase);
+        setStashedUnsavedDraft(null);
+      } else {
+        setStashedUnsavedDraft(draftText);
+        setDraftText(originalBase);
+      }
+      return;
+    }
+
+    if (onResetOriginal) {
+      await onResetOriginal(currentResult.id);
+    }
+  };
+
+  const handleBringBackEditsClick = async (fromEditMode: boolean) => {
+    if (!currentResult) return;
+    setConfirmReset(false);
+    if (fromEditMode && stashedUnsavedDraft !== null) {
+      setDraftText(stashedUnsavedDraft);
+      setStashedUnsavedDraft(null);
+      return;
+    }
+    if (onRestoreStashedEdit && currentResult.stashedEditedText) {
+      const restoredPreview = currentResult.stashedEditedText;
+      await onRestoreStashedEdit(currentResult.id);
+      if (fromEditMode) {
+        setDraftText(restoredPreview);
+      }
+    }
   };
 
   const activeModeLabel =
@@ -511,15 +562,30 @@ export function CaptureView({
                     {(isEdited ||
                       draftText.trim() !==
                         (currentResult.originalText ?? currentResult.text).trim()) &&
-                      onResetOriginal && (
+                    onResetOriginal ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleResetOriginalClick(true)}
+                        className={
+                          confirmReset
+                            ? 'danger-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold'
+                            : 'surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold'
+                        }
+                      >
+                        {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
+                      </button>
+                    ) : (
+                      (stashedUnsavedDraft !== null ||
+                        Boolean(currentResult.stashedEditedText && onRestoreStashedEdit)) && (
                         <button
                           type="button"
-                          onClick={() => void handleResetOriginalClick()}
+                          onClick={() => void handleBringBackEditsClick(true)}
                           className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
                         >
-                          {strings.resetToOriginal}
+                          {strings.bringBackEdits}
                         </button>
-                      )}
+                      )
+                    )}
                   </div>
                 </div>
               ) : (
@@ -616,14 +682,30 @@ export function CaptureView({
                       </button>
                     )}
 
-                    {!settings.disableEditing && isEdited && onResetOriginal && (
+                    {!settings.disableEditing && isEdited && onResetOriginal ? (
                       <button
                         type="button"
-                        onClick={() => void handleResetOriginalClick()}
-                        className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                        onClick={() => void handleResetOriginalClick(false)}
+                        className={
+                          confirmReset
+                            ? 'danger-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold'
+                            : 'surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold'
+                        }
                       >
-                        {strings.resetToOriginal}
+                        {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
                       </button>
+                    ) : (
+                      !settings.disableEditing &&
+                      currentResult.stashedEditedText &&
+                      onRestoreStashedEdit && (
+                        <button
+                          type="button"
+                          onClick={() => void handleBringBackEditsClick(false)}
+                          className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"
+                        >
+                          {strings.bringBackEdits}
+                        </button>
+                      )
                     )}
                   </div>
                 </>

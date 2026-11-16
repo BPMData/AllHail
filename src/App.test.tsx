@@ -941,16 +941,32 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByText('Corrected worksheet description for Schoology.')).toBeDefined();
     expect(screen.getByText(new RegExp(strings.editedTag))).toBeDefined();
 
-    // Return to Camera and Reset to original
+    // Return to Camera -> first click on Reset to original asks "Sure?" in red without resetting yet
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
+    fireEvent.click(screen.getByRole('button', { name: strings.resetToOriginal }));
+    const confirmBtn = screen.getByRole('button', { name: strings.confirmResetToOriginal });
+    expect(confirmBtn.className).toContain('danger-button');
+    expect(screen.getByText('Corrected worksheet description for Schoology.')).toBeDefined();
+
+    // Second click ("Sure?") actually resets and replaces button with "Bring back edits"
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: strings.resetToOriginal }));
+      fireEvent.click(confirmBtn);
     });
     expect(screen.getByText('Original worksheet description with typo.')).toBeDefined();
     expect(screen.getByRole('status').textContent).toContain(strings.editResetStatus);
     expect(screen.queryByRole('button', { name: strings.resetToOriginal })).toBeNull();
+    const bringBackBtn = screen.getByRole('button', { name: strings.bringBackEdits });
+    expect(bringBackBtn).toBeDefined();
 
-    // Enable Disable description editing in Settings -> persists and hides Edit button while keeping Copy text & tap-to-pause
+    // Clicking "Bring back edits" restores the edited description and brings Reset back
+    await act(async () => {
+      fireEvent.click(bringBackBtn);
+    });
+    expect(screen.getByText('Corrected worksheet description for Schoology.')).toBeDefined();
+    expect(screen.getByRole('status').textContent).toContain(strings.editBroughtBackStatus);
+    expect(screen.getByRole('button', { name: strings.resetToOriginal })).toBeDefined();
+
+    // Enable Disable description editing in Settings -> persists and hides Edit/Reset/Bring-back while keeping Copy text & tap-to-pause
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
     const disableToggle = screen.getByLabelText(new RegExp(strings.disableEditingLabel)) as HTMLInputElement;
     expect(disableToggle.checked).toBe(false);
@@ -960,6 +976,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
     expect(screen.queryByRole('button', { name: strings.editDescription })).toBeNull();
+    expect(screen.queryByRole('button', { name: strings.resetToOriginal })).toBeNull();
+    expect(screen.queryByRole('button', { name: strings.bringBackEdits })).toBeNull();
     expect(screen.getByRole('button', { name: strings.readerTapToPause })).toBeDefined();
     expect(screen.getByRole('button', { name: strings.copyText })).toBeDefined();
 

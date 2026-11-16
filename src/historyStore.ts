@@ -7,6 +7,7 @@ export type HistoryEntry = {
   model: string;
   text: string;
   originalText?: string;
+  stashedEditedText?: string;
   sourceName?: string;
   thumbnailDataUrl?: string;
 };
@@ -124,33 +125,49 @@ export async function clearHistory(): Promise<void> {
   }
 }
 
-export function applyDescriptionEdit<T extends { text: string; originalText?: string }>(
-  entry: T,
-  nextText: string,
-): T {
+export function applyDescriptionEdit<
+  T extends { text: string; originalText?: string; stashedEditedText?: string },
+>(entry: T, nextText: string): T {
   const trimmed = nextText.trim();
   if (!trimmed) return entry;
   const baseOriginal = entry.originalText ?? entry.text;
   if (trimmed === baseOriginal.trim()) {
     const rest = { ...entry };
     delete rest.originalText;
+    delete rest.stashedEditedText;
     return { ...rest, text: baseOriginal };
   }
-  return {
+  const next = {
     ...entry,
     text: trimmed,
     originalText: baseOriginal,
   };
+  delete next.stashedEditedText;
+  return next;
 }
 
-export function resetDescriptionToOriginal<T extends { text: string; originalText?: string }>(
-  entry: T,
-): T {
+export function resetDescriptionToOriginal<
+  T extends { text: string; originalText?: string; stashedEditedText?: string },
+>(entry: T): T {
   if (!entry.originalText) return entry;
   const rest = { ...entry };
   delete rest.originalText;
   return {
     ...rest,
     text: entry.originalText,
+    stashedEditedText: entry.text,
+  };
+}
+
+export function restoreStashedEdit<
+  T extends { text: string; originalText?: string; stashedEditedText?: string },
+>(entry: T): T {
+  if (!entry.stashedEditedText) return entry;
+  const rest = { ...entry };
+  delete rest.stashedEditedText;
+  return {
+    ...rest,
+    text: entry.stashedEditedText,
+    originalText: entry.text,
   };
 }
