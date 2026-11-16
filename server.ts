@@ -30,6 +30,11 @@ export async function createApp({
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  app.use((_req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    next();
+  });
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.post('/api/describe', express.json({ limit: '6mb' }), createDescribeHandler(describeDeps));
   // Ensure malformed JSON or oversized bodies on /api return JSON instead of HTML.

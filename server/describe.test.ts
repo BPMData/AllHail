@@ -1,6 +1,7 @@
 import express from 'express';
 import { once } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../server.ts';
 import { PROMPTS } from '../shared/prompts.ts';
 import { createDescribeHandler, type DescribeDeps } from './describe.ts';
 import { createRateLimiter } from './rateLimit.ts';
@@ -13,6 +14,11 @@ async function withServer(
   fn: (baseUrl: string) => Promise<void>,
 ) {
   const app = express();
+  app.use((_req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+    next();
+  });
   app.post('/api/describe', express.json({ limit: '6mb' }), createDescribeHandler(describeDeps));
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -26,6 +32,26 @@ async function withServer(
     );
   }
 }
+
+describe('server isolation headers', () => {
+  it('serves COOP same-origin and COEP credentialless headers on responses', async () => {
+    const app = await createApp({ production: true });
+    const server = app.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/api/health`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+      expect(res.headers.get('cross-origin-embedder-policy')).toBe('credentialless');
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve())),
+      );
+    }
+  });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

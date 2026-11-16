@@ -1,3 +1,4 @@
+import { splitTextForSpeech } from '../../shared/speechChunks.ts';
 import { cleanTextForSpeech } from '../../shared/speechCleaner.ts';
 import { strings } from '../../shared/strings.ts';
 import type { DeviceClass, VoiceOrderPreference } from '../settings.ts';
@@ -8,6 +9,8 @@ export type VoiceProviderId = 'device' | 'kokoro';
 export type SpeakCallbacks = {
   rate: number;
   voice?: string;
+  deviceVoiceName?: string | null;
+  online?: boolean;
   onStart?: (provider: VoiceProviderId) => void;
   onEnd?: () => void;
   onError?: (err: Error) => void;
@@ -19,13 +22,235 @@ export type VoiceProvider = {
   speak: (cleanedText: string, callbacks: SpeakCallbacks) => SpeechControlHandle;
 };
 
+export const KOKORO_FIRST_AUDIO_TIMEOUT_MS = 4000;
+
+const NOVELTY_VOICES = new Set([
+  'albert',
+  'bad news',
+  'bahh',
+  'bells',
+  'boing',
+  'bubbles',
+  'cellos',
+  'fred',
+  'good news',
+  'jester',
+  'junior',
+  'kathy',
+  'organ',
+  'ralph',
+  'superstar',
+  'trinoids',
+  'whisper',
+  'wobble',
+  'zarvox',
+]);
+
+const CURATED_NATURAL_NAMES = [
+  'samantha',
+  'ava',
+  'daniel',
+  'karen',
+  'moira',
+  'tessa',
+  'rishi',
+];
+
+const ELOQUENCE_NAMES = [
+  'reed',
+  'sandy',
+  'shelley',
+  'flo',
+  'eddy',
+  'rocko',
+  'grandma',
+  'grandpa',
+];
+
+function isEnglishLang(lang: string): boolean {
+  return /^en(?:[-_]|$)/i.test(lang.trim());
+}
+
+function matchesVoiceToken(voiceName: string, target: string): boolean {
+  const lower = voiceName.trim().toLowerCase();
+  return lower === target || lower.startsWith(`${target} `) || lower.startsWith(`${target}(`);
+}
+
+export function isNoveltyVoiceName(name: string): boolean {
+  const lower = name.trim().toLowerCase();
+  if (!lower) return false;
+  if (NOVELTY_VOICES.has(lower)) return true;
+  for (const novelty of NOVELTY_VOICES) {
+    if (lower.startsWith(`${novelty} `) || lower.startsWith(`${novelty}(`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isOnlineOnlyDeviceVoice(voice: Pick<SpeechSynthesisVoice, 'name'>): boolean {
+  return /online|google/i.test(voice.name);
+}
+
+/**
+ * Returns non-novelty English (`en-*`) voices in browser order (deduplicated by name).
+ */
+export function getAllowedEnglishDeviceVoices(
+  voices: readonly SpeechSynthesisVoice[],
+): SpeechSynthesisVoice[] {
+  const seen = new Set<string>();
+  const allowed: SpeechSynthesisVoice[] = [];
+  for (const voice of voices) {
+    if (!isEnglishLang(voice.lang) || isNoveltyVoiceName(voice.name)) continue;
+    if (seen.has(voice.name)) continue;
+    seen.add(voice.name);
+    allowed.push(voice);
+  }
+  return allowed;
+}
+
+export function getDeviceVoiceShortName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'your voice';
+  let cleaned = trimmed;
+  if (/^microsoft\s+/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^microsoft\s+/i, '');
+    cleaned = cleaned.replace(/\s+online\b.*$/i, '');
+    cleaned = cleaned.replace(/\s+desktop\b.*$/i, '');
+    cleaned = cleaned.replace(/\s*-\s*english.*$/i, '');
+    cleaned = cleaned.replace(/multilingual\s*$/i, '').trim();
+  }
+  cleaned = cleaned.replace(/\s*\(.*$/, '').trim();
+  return cleaned || trimmed;
+}
+
+/**
+ * Selects the best automatic English device voice following the ordered fallback rules,
+ * excluding novelty voices and skipping online-only voices when offline.
+ */
+export function selectBestDeviceVoice(
+  voices: readonly SpeechSynthesisVoice[],
+  options: { online?: boolean } = {},
+): SpeechSynthesisVoice | null {
+  const online = options.online ?? true;
+  const allowed = getAllowedEnglishDeviceVoices(voices);
+  const eligible = online ? allowed : allowed.filter((v) => !isOnlineOnlyDeviceVoice(v));
+  if (eligible.length === 0) return null;
+
+  // a. "Allison (Enhanced)"
+  const allisonEnhanced = eligible.find((v) => matchesVoiceToken(v.name, 'allison (enhanced)'));
+  if (allisonEnhanced) return allisonEnhanced;
+
+  // b. Any other voice with "Premium" or "Enhanced" in its name
+  const premiumOrEnhanced = eligible.find((v) => /\b(?:premium|enhanced)\b/i.test(v.name));
+  if (premiumOrEnhanced) return premiumOrEnhanced;
+
+  // c. Any voice with "Natural" in its name
+  const natural = eligible.find((v) => /\bnatural\b/i.test(v.name));
+  if (natural) return natural;
+
+  // d. "Google US English", then "Google UK English Female"
+  for (const googleName of ['google us english', 'google uk english female']) {
+    const match = eligible.find((v) => matchesVoiceToken(v.name, googleName));
+    if (match) return match;
+  }
+
+  // e. Samantha, Ava, Daniel, Karen, Moira, Tessa, Rishi
+  for (const curated of CURATED_NATURAL_NAMES) {
+    const match = eligible.find((v) => matchesVoiceToken(v.name, curated));
+    if (match) return match;
+  }
+
+  // f. Eloquence voices: Reed, Sandy, Shelley, Flo, Eddy, Rocko, Grandma, Grandpa
+  for (const eloquence of ELOQUENCE_NAMES) {
+    const match = eligible.find((v) => matchesVoiceToken(v.name, eloquence));
+    if (match) return match;
+  }
+
+  // g. System default voice (excluding novelty), then any other English voice
+  const systemDefault = eligible.find((v) => v.default);
+  if (systemDefault) return systemDefault;
+
+  return eligible[0] ?? null;
+}
+
+export function resolveDeviceVoice(
+  voices: readonly SpeechSynthesisVoice[],
+  options: { preferredVoiceName?: string | null; online?: boolean } = {},
+): { voice: SpeechSynthesisVoice | null; preferredMissing: boolean } {
+  const online = options.online ?? true;
+  const preferred = options.preferredVoiceName?.trim();
+  if (preferred) {
+    const allowed = getAllowedEnglishDeviceVoices(voices);
+    const match = allowed.find((v) => v.name.trim().toLowerCase() === preferred.toLowerCase());
+    if (match && (online || !isOnlineOnlyDeviceVoice(match))) {
+      return { voice: match, preferredMissing: false };
+    }
+    return {
+      voice: selectBestDeviceVoice(voices, { online }),
+      preferredMissing: true,
+    };
+  }
+
+  return {
+    voice: selectBestDeviceVoice(voices, { online }),
+    preferredMissing: false,
+  };
+}
+
+export function getBrowserDeviceVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
+  try {
+    const voices = typeof window.speechSynthesis.getVoices === 'function'
+      ? window.speechSynthesis.getVoices()
+      : [];
+    return getAllowedEnglishDeviceVoices(voices);
+  } catch {
+    return [];
+  }
+}
+
+export function subscribeBrowserDeviceVoices(
+  listener: (voices: SpeechSynthesisVoice[]) => void,
+): () => void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return () => undefined;
+  }
+  const update = () => listener(getBrowserDeviceVoices());
+  update();
+  const synth = window.speechSynthesis;
+  if (typeof synth.addEventListener === 'function') {
+    synth.addEventListener('voiceschanged', update);
+    return () => synth.removeEventListener?.('voiceschanged', update);
+  }
+  return () => undefined;
+}
+
 export function resolveVoiceOrder(
   deviceClass: DeviceClass,
   preference: VoiceOrderPreference,
+  kokoroTooSlow = false,
 ): readonly VoiceProviderId[] {
   if (preference === 'device-first') return ['device', 'kokoro'];
   if (preference === 'kokoro-first') return ['kokoro', 'device'];
+  if (kokoroTooSlow) return ['device', 'kokoro'];
   return deviceClass === 'phone' ? ['device', 'kokoro'] : ['kokoro', 'device'];
+}
+
+// Keep strong references so Chrome/Safari GC never collects utterances mid-speech.
+const retainedUtterances = new Set<SpeechSynthesisUtterance>();
+
+function pickCurrentVoice(
+  synth: SpeechSynthesis,
+  options?: { deviceVoiceName?: string | null; online?: boolean },
+): SpeechSynthesisVoice | null {
+  const voices = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
+  const online =
+    options?.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+  return resolveDeviceVoice(voices, {
+    preferredVoiceName: options?.deviceVoiceName,
+    online,
+  }).voice;
 }
 
 export function createBrowserDeviceVoiceProvider(): VoiceProvider {
@@ -33,6 +258,14 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
     typeof window !== 'undefined' &&
     'speechSynthesis' in window &&
     typeof SpeechSynthesisUtterance !== 'undefined';
+
+  // Trigger initial voice list loading and keep it warm when voiceschanged fires.
+  if (hasSynth() && typeof window.speechSynthesis.addEventListener === 'function') {
+    window.speechSynthesis.getVoices?.();
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
+      window.speechSynthesis.getVoices?.();
+    });
+  }
 
   return {
     id: 'device',
@@ -44,34 +277,79 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
         return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
       }
 
-      let stopped = false;
-      const synth = window.speechSynthesis;
-      synth.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(cleanedText);
-      utterance.rate = callbacks.rate;
-      utterance.lang = strings.language;
-
-      // Pick a local/English voice when available for steadier pronunciation.
-      const voices = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
-      const localEn =
-        voices.find((v) => v.localService && v.lang.toLowerCase().startsWith('en')) ??
-        voices.find((v) => v.lang.toLowerCase().startsWith('en'));
-      if (localEn) {
-        utterance.voice = localEn;
+      const chunks = splitTextForSpeech(cleanedText);
+      if (chunks.length === 0) {
+        queueMicrotask(() => callbacks.onEnd?.());
+        return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
       }
 
-      utterance.onstart = () => {
-        if (!stopped) callbacks.onStart?.('device');
-      };
-      utterance.onend = () => {
-        if (!stopped) callbacks.onEnd?.();
-      };
-      utterance.onerror = () => {
-        if (!stopped) callbacks.onError?.(new Error('Device voice failed'));
+      let stopped = false;
+      let started = false;
+      let pendingStartTimer: ReturnType<typeof setTimeout> | null = null;
+      const synth = window.speechSynthesis;
+      const wasActive = Boolean(synth.speaking || synth.pending);
+
+      if (wasActive) {
+        synth.cancel();
+      }
+
+      const selectedVoice = pickCurrentVoice(synth, {
+        deviceVoiceName: callbacks.deviceVoiceName,
+        online: callbacks.online,
+      });
+
+      const speakChunk = (index: number) => {
+        if (stopped) return;
+        if (index >= chunks.length) {
+          callbacks.onEnd?.();
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(chunks[index]);
+        utterance.rate = callbacks.rate;
+        utterance.lang = selectedVoice?.lang || strings.language;
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+
+        retainedUtterances.add(utterance);
+
+        utterance.onstart = () => {
+          if (stopped) return;
+          if (!started) {
+            started = true;
+            callbacks.onStart?.('device');
+          }
+        };
+
+        utterance.onend = () => {
+          retainedUtterances.delete(utterance);
+          if (stopped) return;
+          speakChunk(index + 1);
+        };
+
+        utterance.onerror = () => {
+          retainedUtterances.delete(utterance);
+          if (stopped) return;
+          if (!started) {
+            callbacks.onError?.(new Error('Device voice failed'));
+          } else {
+            speakChunk(index + 1);
+          }
+        };
+
+        synth.speak(utterance);
       };
 
-      synth.speak(utterance);
+      // Avoid Chrome's synchronous cancel()-then-speak() drop bug when interrupting active speech.
+      if (wasActive) {
+        pendingStartTimer = setTimeout(() => {
+          pendingStartTimer = null;
+          speakChunk(0);
+        }, 40);
+      } else {
+        speakChunk(0);
+      }
 
       return {
         pause: () => {
@@ -82,7 +360,14 @@ export function createBrowserDeviceVoiceProvider(): VoiceProvider {
         },
         stop: () => {
           stopped = true;
-          synth.cancel();
+          if (pendingStartTimer !== null) {
+            clearTimeout(pendingStartTimer);
+            pendingStartTimer = null;
+          }
+          retainedUtterances.clear();
+          if (synth.speaking || synth.pending) {
+            synth.cancel();
+          }
         },
       };
     },
@@ -95,15 +380,22 @@ export type SpeechStatusSnapshot = {
   activeProvider: VoiceProviderId | null;
 };
 
+export type UnlockCueOptions = {
+  deviceVoiceName?: string | null;
+  online?: boolean;
+};
+
 export type CoordinatorDeps = {
   deviceProvider: VoiceProvider;
   kokoroProvider: VoiceProvider;
   unlockAudioContext: () => void;
-  unlockDeviceCue?: (cueText: string) => void;
+  playClickSound?: () => void;
+  unlockDeviceCue?: (cueText: string, options?: UnlockCueOptions) => void;
+  firstAudioTimeoutMs?: number;
 };
 
-export function createDefaultUnlockCue(): (cueText: string) => void {
-  return (cueText: string) => {
+export function createDefaultUnlockCue(): (cueText: string, options?: UnlockCueOptions) => void {
+  return (cueText: string, options?: UnlockCueOptions) => {
     if (
       typeof window === 'undefined' ||
       !('speechSynthesis' in window) ||
@@ -113,10 +405,22 @@ export function createDefaultUnlockCue(): (cueText: string) => void {
     }
     try {
       const synth = window.speechSynthesis;
-      synth.cancel();
+      if (synth.speaking || synth.pending) {
+        synth.cancel();
+      }
       const cue = new SpeechSynthesisUtterance(cueText);
-      cue.lang = strings.language;
       cue.rate = 1.05;
+      const voice = pickCurrentVoice(synth, {
+        deviceVoiceName: options?.deviceVoiceName,
+        online: options?.online,
+      });
+      cue.lang = voice?.lang || strings.language;
+      if (voice) {
+        cue.voice = voice;
+      }
+      retainedUtterances.add(cue);
+      cue.onend = () => retainedUtterances.delete(cue);
+      cue.onerror = () => retainedUtterances.delete(cue);
       synth.speak(cue);
     } catch {
       // Ignore if speechSynthesis is blocked.
@@ -127,6 +431,7 @@ export function createDefaultUnlockCue(): (cueText: string) => void {
 export class SpeechCoordinator {
   private deps: CoordinatorDeps;
   private activeHandle: SpeechControlHandle | null = null;
+  private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private activeJobId = 0;
   private snapshot: SpeechStatusSnapshot = {
     speaking: false,
@@ -151,6 +456,13 @@ export class SpeechCoordinator {
     };
   }
 
+  private clearWatchdog() {
+    if (this.watchdogTimer !== null) {
+      clearTimeout(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
   private updateSnapshot(next: SpeechStatusSnapshot) {
     this.snapshot = next;
     for (const listener of this.listeners) {
@@ -159,16 +471,37 @@ export class SpeechCoordinator {
   }
 
   /**
-   * Synchronously unlocks iOS speechSynthesis & Web AudioContext inside the tap
-   * handler of Quick look / Full detail buttons.
+   * Synchronously unlocks iOS speechSynthesis & Web AudioContext inside capture
+   * shutter tap handlers (speaks short "Describing" cue using the chosen/automatic device voice).
    */
-  unlockOnUserTap({ speakCue }: { speakCue: boolean }): void {
+  unlockOnCaptureTap({
+    speakCue,
+    deviceVoiceName,
+    online,
+  }: {
+    speakCue: boolean;
+    deviceVoiceName?: string | null;
+    online?: boolean;
+  }): void {
     this.stop();
     this.deps.unlockAudioContext();
     if (speakCue) {
       const unlockCue = this.deps.unlockDeviceCue ?? createDefaultUnlockCue();
-      unlockCue(strings.statusShortCue);
+      unlockCue(strings.statusShortCue, { deviceVoiceName, online });
     }
+  }
+
+  /**
+   * Silently unlocks/resumes Web AudioContext for playback & preview taps without
+   * speaking "Describing".
+   */
+  unlockAudioOnly(): void {
+    this.deps.unlockAudioContext();
+  }
+
+  playSettingsClick(): void {
+    this.deps.unlockAudioContext();
+    this.deps.playClickSound?.();
   }
 
   speakJob(
@@ -178,13 +511,23 @@ export class SpeechCoordinator {
       voiceOrder,
       rate,
       kokoroVoiceId,
+      deviceVoiceName,
+      online,
       kokoroAllowed = true,
+      kokoroTooSlow = false,
+      forceProvider,
+      onProviderStarted,
     }: {
       deviceClass: DeviceClass;
       voiceOrder: VoiceOrderPreference;
       rate: number;
       kokoroVoiceId: string;
+      deviceVoiceName?: string | null;
+      online?: boolean;
       kokoroAllowed?: boolean;
+      kokoroTooSlow?: boolean;
+      forceProvider?: VoiceProviderId;
+      onProviderStarted?: (provider: VoiceProviderId) => void;
     },
   ): VoiceProviderId | null {
     this.stop();
@@ -197,7 +540,10 @@ export class SpeechCoordinator {
       kokoro: this.deps.kokoroProvider,
     };
 
-    const order = resolveVoiceOrder(deviceClass, voiceOrder);
+    const order: readonly VoiceProviderId[] = forceProvider
+      ? [forceProvider]
+      : resolveVoiceOrder(deviceClass, voiceOrder, kokoroTooSlow);
+
     const readyChain = order
       .map((id) => providersById[id])
       .filter((provider) => {
@@ -210,11 +556,13 @@ export class SpeechCoordinator {
       return null;
     }
 
-    // Lock one voice per job: once a provider starts playing, never switch mid-job.
+    const firstAudioTimeoutMs = this.deps.firstAudioTimeoutMs ?? KOKORO_FIRST_AUDIO_TIMEOUT_MS;
+    // Lock one voice per job: once a provider starts audible playback, never switch mid-job.
     let started = false;
     let index = 0;
 
     const tryNext = (): VoiceProviderId | null => {
+      this.clearWatchdog();
       if (jobId !== this.activeJobId || index >= readyChain.length) {
         if (jobId === this.activeJobId) {
           this.activeHandle = null;
@@ -224,32 +572,53 @@ export class SpeechCoordinator {
       }
 
       const provider = readyChain[index++];
+      let timedOutThisAttempt = false;
+
       this.updateSnapshot({
         speaking: true,
         paused: false,
         activeProvider: provider.id,
       });
 
+      // Start the 4-second first-audio timeout whenever trying Kokoro with another provider behind it.
+      if (provider.id === 'kokoro' && index < readyChain.length) {
+        this.watchdogTimer = setTimeout(() => {
+          this.watchdogTimer = null;
+          if (jobId !== this.activeJobId || started) return;
+          timedOutThisAttempt = true;
+          const handleToCancel = this.activeHandle;
+          this.activeHandle = null;
+          handleToCancel?.stop();
+          tryNext();
+        }, firstAudioTimeoutMs);
+      }
+
       try {
-        this.activeHandle = provider.speak(cleaned, {
+        const handle = provider.speak(cleaned, {
           rate,
           voice: kokoroVoiceId,
+          deviceVoiceName,
+          online,
           onStart: () => {
-            if (jobId !== this.activeJobId) return;
+            if (jobId !== this.activeJobId || timedOutThisAttempt) return;
+            this.clearWatchdog();
             started = true;
             this.updateSnapshot({
               speaking: true,
               paused: false,
               activeProvider: provider.id,
             });
+            onProviderStarted?.(provider.id);
           },
           onEnd: () => {
-            if (jobId !== this.activeJobId) return;
+            if (jobId !== this.activeJobId || timedOutThisAttempt) return;
+            this.clearWatchdog();
             this.activeHandle = null;
             this.updateSnapshot({ speaking: false, paused: false, activeProvider: null });
           },
           onError: () => {
-            if (jobId !== this.activeJobId) return;
+            if (jobId !== this.activeJobId || timedOutThisAttempt) return;
+            this.clearWatchdog();
             this.activeHandle = null;
             if (!started && index < readyChain.length) {
               tryNext();
@@ -258,8 +627,14 @@ export class SpeechCoordinator {
             this.updateSnapshot({ speaking: false, paused: false, activeProvider: null });
           },
         });
+        if (!timedOutThisAttempt && jobId === this.activeJobId) {
+          this.activeHandle = handle;
+        } else {
+          handle.stop();
+        }
         return provider.id;
       } catch {
+        this.clearWatchdog();
         this.activeHandle = null;
         if (!started && index < readyChain.length) {
           return tryNext();
@@ -296,6 +671,7 @@ export class SpeechCoordinator {
 
   stop(): void {
     this.activeJobId += 1;
+    this.clearWatchdog();
     if (this.activeHandle) {
       this.activeHandle.stop();
       this.activeHandle = null;

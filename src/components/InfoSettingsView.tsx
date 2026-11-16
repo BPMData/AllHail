@@ -12,9 +12,16 @@ type InfoSettingsViewProps = {
   deviceClass: DeviceClass;
   online: boolean;
   settings: AppSettings;
+  deviceVoices: readonly SpeechSynthesisVoice[];
+  deviceVoiceUnavailable: boolean;
   kokoroState: KokoroState;
   needRefresh: boolean;
+  savedVisible: boolean;
+  savedAnnouncement: string;
+  voicePreviewMessage: string | null;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
+  onSelectDeviceVoice: (voiceName: string | null) => void;
+  onSelectKokoroVoice: (voiceId: string) => void;
   onRetryKokoro: () => void;
   onUpdateApp: () => void;
 };
@@ -23,9 +30,16 @@ export function InfoSettingsView({
   deviceClass,
   online,
   settings,
+  deviceVoices,
+  deviceVoiceUnavailable,
   kokoroState,
   needRefresh,
+  savedVisible,
+  savedAnnouncement,
+  voicePreviewMessage,
   onUpdateSettings,
+  onSelectDeviceVoice,
+  onSelectKokoroVoice,
   onRetryKokoro,
   onUpdateApp,
 }: InfoSettingsViewProps) {
@@ -33,7 +47,9 @@ export function InfoSettingsView({
     if (deviceClass === 'phone' && !settings.kokoroEnabledOnPhone) {
       return strings.kokoroStatusOff;
     }
-    if (kokoroState.status === 'ready') return strings.kokoroStatusReady;
+    if (kokoroState.status === 'ready') {
+      return kokoroState.tooSlow ? strings.kokoroTooSlow : strings.kokoroStatusReady;
+    }
     if (kokoroState.status === 'downloading') {
       return `${strings.kokoroStatusDownloading} (${kokoroState.progress}%)`;
     }
@@ -45,9 +61,32 @@ export function InfoSettingsView({
   return (
     <div className="space-y-8">
       <section aria-labelledby="settings-heading" className="panel-card rounded-3xl border-2 p-5 sm:p-6">
-        <h1 id="settings-heading" className="text-3xl font-bold leading-tight">
-          {strings.settingsHeading}
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 id="settings-heading" className="text-3xl font-bold leading-tight">
+            {strings.settingsHeading}
+          </h1>
+
+          {/* Unobtrusive visual saved indicator */}
+          {savedVisible && (
+            <span
+              data-testid="settings-saved-badge"
+              className="saved-badge inline-flex items-center gap-1 rounded-xl border-2 px-3 py-1 text-sm font-bold"
+            >
+              ✓ {strings.settingsSaved}
+            </span>
+          )}
+        </div>
+
+        {/* Quiet polite live announcement for screen readers when a setting saves */}
+        <span
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="settings-saved-live"
+        >
+          {savedAnnouncement}
+        </span>
 
         {/* Read aloud automatically checkbox */}
         <div className="mt-5 border-b pb-5">
@@ -107,6 +146,37 @@ export function InfoSettingsView({
           </select>
         </div>
 
+        {/* Device voice picker */}
+        <div className="mt-5 border-b pb-5">
+          <label htmlFor="device-voice-select" className="block text-lg font-bold">
+            {strings.deviceVoiceLabel}
+          </label>
+          <select
+            id="device-voice-select"
+            value={settings.deviceVoiceName ?? ''}
+            onChange={(e) => onSelectDeviceVoice(e.target.value ? e.target.value : null)}
+            className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
+          >
+            <option value="">{strings.deviceVoiceAuto}</option>
+            {settings.deviceVoiceName &&
+              !deviceVoices.some(
+                (v) => v.name.trim().toLowerCase() === settings.deviceVoiceName!.trim().toLowerCase(),
+              ) && (
+                <option value={settings.deviceVoiceName}>{settings.deviceVoiceName}</option>
+              )}
+            {deviceVoices.map((voice) => (
+              <option key={voice.name} value={voice.name}>
+                {voice.name}
+              </option>
+            ))}
+          </select>
+          {deviceVoiceUnavailable && (
+            <p className="mt-2 text-sm font-semibold" data-testid="device-voice-unavailable">
+              {strings.deviceVoiceUnavailable}
+            </p>
+          )}
+        </div>
+
         {/* Kokoro browser voice (~90 MB) */}
         <div className="mt-5 space-y-4">
           <h2 className="text-xl font-bold">{strings.kokoroHeading}</h2>
@@ -130,6 +200,18 @@ export function InfoSettingsView({
             {kokoroStatusMessage}
           </p>
 
+          {kokoroState.status === 'downloading' && (
+            <div className="flex flex-wrap items-center gap-3">
+              <progress
+                max={100}
+                value={kokoroState.progress}
+                aria-label={strings.kokoroProgressLabel}
+                className="kokoro-progress min-w-[160px] flex-1"
+              />
+              <span className="text-base font-bold tabular-nums">{kokoroState.progress}%</span>
+            </div>
+          )}
+
           {kokoroState.status === 'error' && (
             <button
               type="button"
@@ -147,7 +229,7 @@ export function InfoSettingsView({
             <select
               id="kokoro-voice-select"
               value={settings.kokoroVoiceId}
-              onChange={(e) => onUpdateSettings({ kokoroVoiceId: e.target.value })}
+              onChange={(e) => onSelectKokoroVoice(e.target.value)}
               className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
             >
               {KOKORO_VOICES.map((voice) => (
@@ -156,6 +238,11 @@ export function InfoSettingsView({
                 </option>
               ))}
             </select>
+            {voicePreviewMessage && (
+              <p className="mt-2 text-sm font-semibold" data-testid="kokoro-preview-note">
+                {voicePreviewMessage}
+              </p>
+            )}
           </div>
         </div>
       </section>

@@ -28,39 +28,58 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 function makeTestRuntime() {
   const spokenTexts: string[] = [];
-  const cueTexts: string[] = [];
+  const deviceCalls: Array<{ text: string; deviceVoiceName?: string | null; online?: boolean }> = [];
+  const kokoroSpokenTexts: Array<{ text: string; voice?: string }> = [];
+  const cueCalls: Array<{ cue: string; deviceVoiceName?: string | null; online?: boolean }> = [];
   const unlockAudioContext = vi.fn();
+  const playClickSound = vi.fn();
+
+  const kokoroClient = new KokoroBrowserClient();
+  const startDownloadSpy = vi.spyOn(kokoroClient, 'startDownload').mockImplementation(() => undefined);
+  const retryDownloadSpy = vi.spyOn(kokoroClient, 'retryDownload').mockImplementation(() => undefined);
 
   const deviceProvider: VoiceProvider = {
     id: 'device',
     isReady: () => true,
     speak: (text, callbacks) => {
       spokenTexts.push(text);
+      deviceCalls.push({
+        text,
+        deviceVoiceName: callbacks.deviceVoiceName,
+        online: callbacks.online,
+      });
       callbacks.onStart?.('device');
       return { pause: vi.fn(), resume: vi.fn(), stop: vi.fn() };
     },
   };
   const kokoroProvider: VoiceProvider = {
     id: 'kokoro',
-    isReady: () => false,
-    speak: () => ({ pause: vi.fn(), resume: vi.fn(), stop: vi.fn() }),
+    isReady: () => kokoroClient.isReady(),
+    speak: (text, callbacks) => {
+      kokoroSpokenTexts.push({ text, voice: callbacks.voice });
+      callbacks.onStart?.('kokoro');
+      return { pause: vi.fn(), resume: vi.fn(), stop: vi.fn() };
+    },
   };
-
-  const kokoroClient = new KokoroBrowserClient();
-  const startDownloadSpy = vi.spyOn(kokoroClient, 'startDownload').mockImplementation(() => undefined);
 
   const coordinator = new SpeechCoordinator({
     deviceProvider,
     kokoroProvider,
     unlockAudioContext,
-    unlockDeviceCue: (cue) => cueTexts.push(cue),
+    playClickSound,
+    unlockDeviceCue: (cue, options) => cueCalls.push({ cue, ...options }),
   });
 
   return {
     spokenTexts,
-    cueTexts,
+    deviceCalls,
+    kokoroSpokenTexts,
+    cueCalls,
+    cueTexts: cueCalls.map((c) => c.cue),
     unlockAudioContext,
+    playClickSound,
     startDownloadSpy,
+    retryDownloadSpy,
     kokoroClient,
     coordinator,
   };
@@ -75,6 +94,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.restoreAllMocks();
 });
@@ -162,8 +182,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     vi.unstubAllGlobals();
   });
 
-  it('unlocks iOS audio on shutter tap, keeps description out of aria-live, and respects autoRead setting', async () => {
-    const { coordinator, kokoroClient, cueTexts, spokenTexts, unlockAudioContext } = makeTestRuntime();
+  it('unlocks iOS audio on shutter tap, does NOT repeat Describing on Read aloud/Repeat, and respects autoRead setting', async () => {
+    const { coordinator, kokoroClient, cueCalls, spokenTexts, unlockAudioContext } = makeTestRuntime();
     vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
       imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
       thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
@@ -189,9 +209,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     const quickBtn = screen.getByRole('button', { name: new RegExp(strings.quickLook) });
     fireEvent.click(quickBtn);
 
-    // Synchronous iOS audio unlock happened during tap
+    // Synchronous iOS audio unlock happened during shutter tap
     expect(unlockAudioContext).toHaveBeenCalledTimes(1);
-    expect(cueTexts).toEqual([strings.statusShortCue]);
+    expect(cueCalls.map((c) => c.cue)).toEqual([strings.statusShortCue]);
 
     const cameraInput = screen.getByTestId('camera-input-describe') as HTMLInputElement;
     const fakeFile = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
@@ -211,6 +231,18 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     // Auto-read spoke the cleaned copy ("three quarters")
     expect(spokenTexts).toEqual(['A watercolor bridge over three quarters of a calm river.']);
 
+    // Stop speech, then tap Read aloud and Repeat: neither may speak "Describing" again
+    fireEvent.click(screen.getByRole('button', { name: strings.stopSpeech }));
+    fireEvent.click(screen.getByRole('button', { name: strings.playAloud }));
+    fireEvent.click(screen.getByRole('button', { name: strings.repeatSpeech }));
+    expect(cueCalls.map((c) => c.cue)).toEqual([strings.statusShortCue]);
+    expect(spokenTexts).toHaveLength(3);
+
+    // Stop speech, tap the description card directly -> also no "Describing" cue
+    fireEvent.click(screen.getByRole('button', { name: strings.stopSpeech }));
+    fireEvent.click(screen.getByRole('button', { name: strings.readerTapToPause }));
+    expect(cueCalls.map((c) => c.cue)).toEqual([strings.statusShortCue]);
+
     // Turn off "Read descriptions aloud automatically" in Settings & Info
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
     const autoReadToggle = screen.getByLabelText(new RegExp(strings.autoReadLabel)) as HTMLInputElement;
@@ -225,8 +257,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       fireEvent.click(sameFullDetail);
     });
 
-    expect(spokenTexts).toHaveLength(1);
-    expect(cueTexts).toHaveLength(1);
+    expect(spokenTexts).toHaveLength(4);
+    expect(cueCalls.map((c) => c.cue)).toEqual([strings.statusShortCue]);
     vi.unstubAllGlobals();
   });
 
@@ -259,6 +291,174 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       />,
     );
     expect(laptopRuntime.startDownloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Kokoro download banner with progress, live mm:ss timer, Retry on error, and throttled announcements', () => {
+    vi.useFakeTimers();
+    const startMs = new Date('2026-01-01T00:00:00Z').getTime();
+    vi.setSystemTime(startMs);
+
+    const { coordinator, kokoroClient, retryDownloadSpy } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="laptop" />);
+
+    expect(screen.queryByTestId('kokoro-banner')).toBeNull();
+
+    // Start downloading at 0%
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs });
+    });
+
+    const banner = screen.getByTestId('kokoro-banner');
+    expect(banner.textContent).toContain(strings.kokoroBannerTitle);
+    expect(banner.textContent).toContain('0%');
+    expect(banner.textContent).toContain(`${strings.kokoroElapsedLabel}: 00:00`);
+    expect(banner.textContent).toContain(strings.kokoroBannerFallbackNote);
+    const progressEl = screen.getByLabelText(strings.kokoroProgressLabel) as HTMLProgressElement;
+    expect(progressEl.tagName).toBe('PROGRESS');
+    expect(progressEl.value).toBe(0);
+    expect(progressEl.closest('[aria-live]')).toBeNull();
+
+    const liveStatus = screen.getByRole('status');
+    expect(liveStatus.textContent).toContain(strings.kokoroAnnounceStart);
+
+    // Advance 12 seconds -> elapsed updates to 00:12, intermediate 20% does NOT spam live region
+    act(() => {
+      vi.advanceTimersByTime(12_000);
+      kokoroClient.setExternalState({ status: 'downloading', progress: 20, startedAt: startMs });
+    });
+    expect(screen.getByTestId('kokoro-banner').textContent).toContain(`${strings.kokoroElapsedLabel}: 00:12`);
+    expect(screen.getByTestId('kokoro-banner').textContent).toContain('20%');
+    expect(liveStatus.textContent).toContain(strings.kokoroAnnounceStart);
+    expect(liveStatus.textContent).not.toContain('20%');
+
+    // Midpoint 50% triggers midpoint live announcement once
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 50, startedAt: startMs });
+    });
+    expect(liveStatus.textContent).toContain(strings.kokoroAnnounceHalf);
+
+    // 80% does NOT announce again
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 80, startedAt: startMs });
+    });
+    expect(liveStatus.textContent).toContain(strings.kokoroAnnounceHalf);
+
+    // Ready hides banner and announces ready
+    act(() => {
+      kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: false, startedAt: null });
+    });
+    expect(screen.queryByTestId('kokoro-banner')).toBeNull();
+    expect(liveStatus.textContent).toContain(strings.kokoroAnnounceReady);
+
+    // Error state displays Retry button inside banner and calls retryDownload
+    act(() => {
+      kokoroClient.setExternalState({ status: 'downloading', progress: 10, startedAt: startMs });
+      kokoroClient.setExternalState({ status: 'error', progress: 0, error: 'Network error' });
+    });
+    expect(screen.getByTestId('kokoro-banner').textContent).toContain(strings.kokoroStatusError);
+    fireEvent.click(screen.getByRole('button', { name: strings.kokoroRetryButton }));
+    expect(retryDownloadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Saved click feedback, tooSlow notice, and previews Kokoro voices only when ready', async () => {
+    const { coordinator, kokoroClient, playClickSound, kokoroSpokenTexts, spokenTexts } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} deviceClassOverride="laptop" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+
+    // Toggling a setting triggers Web Audio click + visual Saved badge + quiet live Saved notice
+    const autoReadToggle = screen.getByLabelText(new RegExp(strings.autoReadLabel));
+    fireEvent.click(autoReadToggle);
+    expect(playClickSound).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('settings-saved-badge').textContent).toContain(strings.settingsSaved);
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-saved-live').textContent).toBe(strings.settingsSaved);
+    });
+
+    // Picking a Kokoro voice while still downloading must NOT speak in device voice
+    const voiceSelect = screen.getByLabelText(strings.kokoroVoiceSelectLabel) as HTMLSelectElement;
+    fireEvent.change(voiceSelect, { target: { value: 'af_bella' } });
+    expect(spokenTexts).toEqual([]);
+    expect(kokoroSpokenTexts).toEqual([]);
+    const expectedWaitNotice = strings.kokoroPreviewNotReadyTemplate.replace('{name}', 'Bella');
+    expect(screen.getByTestId('kokoro-preview-note').textContent).toBe(expectedWaitNotice);
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-saved-live').textContent).toBe(expectedWaitNotice);
+    });
+
+    // Mark Kokoro ready + tooSlow -> Settings displays "Kokoro is too slow on this device"
+    act(() => {
+      kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: true, startedAt: null });
+    });
+    expect(screen.getByTestId('kokoro-status').textContent).toBe(strings.kokoroTooSlow);
+
+    // Picking a Kokoro voice when ready plays the Kokoro greeting in the selected Kokoro voice
+    fireEvent.change(voiceSelect, { target: { value: 'am_michael' } });
+    expect(screen.queryByTestId('kokoro-preview-note')).toBeNull();
+    expect(spokenTexts).toEqual([]);
+    expect(kokoroSpokenTexts).toEqual([
+      {
+        text: strings.kokoroPreviewTemplate.replace('{name}', 'Michael'),
+        voice: 'am_michael',
+      },
+    ]);
+  });
+
+  it('supports Device voice picker, immediate short-name preview, missing-voice fallback, and matching Describing cue voice', () => {
+    const fakeVoices = [
+      { name: 'Allison (Enhanced)', lang: 'en-US', default: false, localService: true, voiceURI: 'allison' },
+      { name: 'Google US English', lang: 'en-US', default: false, localService: false, voiceURI: 'google-us' },
+      { name: 'Samantha', lang: 'en-US', default: true, localService: true, voiceURI: 'samantha' },
+    ] as unknown as SpeechSynthesisVoice[];
+
+    const { coordinator, kokoroClient, deviceCalls, cueCalls } = makeTestRuntime();
+    render(
+      <App
+        coordinator={coordinator}
+        kokoroClient={kokoroClient}
+        deviceClassOverride="phone"
+        deviceVoicesOverride={fakeVoices}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    const deviceSelect = screen.getByLabelText(strings.deviceVoiceLabel) as HTMLSelectElement;
+    expect(deviceSelect.value).toBe('');
+    expect(deviceSelect.options[0].textContent).toBe(strings.deviceVoiceAuto);
+
+    // Choose "Allison (Enhanced)" -> saves and speaks preview with short name "Allison"
+    fireEvent.change(deviceSelect, { target: { value: 'Allison (Enhanced)' } });
+    expect(deviceSelect.value).toBe('Allison (Enhanced)');
+    expect(deviceCalls).toContainEqual({
+      text: strings.deviceVoicePreviewTemplate.replace('{name}', 'Allison'),
+      deviceVoiceName: 'Allison (Enhanced)',
+      online: true,
+    });
+
+    // Return to Camera and tap Quick look -> "Describing" cue receives the chosen deviceVoiceName
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(strings.quickLook) }));
+    expect(cueCalls[0]).toEqual({
+      cue: strings.statusShortCue,
+      deviceVoiceName: 'Allison (Enhanced)',
+      online: true,
+    });
+
+    // Choose "Google US English", then go offline -> shows unavailable notice while preserving saved value
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    const deviceSelect2 = screen.getByLabelText(strings.deviceVoiceLabel) as HTMLSelectElement;
+    fireEvent.change(deviceSelect2, { target: { value: 'Google US English' } });
+    expect(screen.queryByTestId('device-voice-unavailable')).toBeNull();
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    fireEvent(window, new Event('offline'));
+    expect(screen.getByTestId('device-voice-unavailable').textContent).toBe(strings.deviceVoiceUnavailable);
+    expect(deviceSelect2.value).toBe('Google US English');
+
+    // Reconnect -> unavailable notice clears automatically
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+    fireEvent(window, new Event('online'));
+    expect(screen.queryByTestId('device-voice-unavailable')).toBeNull();
   });
 
   it('shows a clear fallback message if optional live viewfinder camera access is denied', async () => {

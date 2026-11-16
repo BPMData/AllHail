@@ -5,16 +5,17 @@ export type AppSettings = {
   autoRead: boolean;
   speechRate: number;
   voiceOrder: VoiceOrderPreference;
+  deviceVoiceName: string | null;
   kokoroEnabledOnPhone: boolean;
   kokoroVoiceId: string;
 };
 
 export const KOKORO_VOICES = [
-  { id: 'af_heart', label: 'Heart (US English)' },
-  { id: 'af_bella', label: 'Bella (US English)' },
-  { id: 'am_michael', label: 'Michael (US English)' },
-  { id: 'bf_emma', label: 'Emma (British English)' },
-  { id: 'bm_george', label: 'George (British English)' },
+  { id: 'af_heart', shortName: 'Heart', label: 'Heart (US English)' },
+  { id: 'af_bella', shortName: 'Bella', label: 'Bella (US English)' },
+  { id: 'am_michael', shortName: 'Michael', label: 'Michael (US English)' },
+  { id: 'bf_emma', shortName: 'Emma', label: 'Emma (British English)' },
+  { id: 'bm_george', shortName: 'George', label: 'George (British English)' },
 ] as const;
 
 export const SPEECH_RATES = [0.8, 1.0, 1.25, 1.5, 2.0] as const;
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoRead: true,
   speechRate: 1.0,
   voiceOrder: 'auto',
+  deviceVoiceName: null,
   kokoroEnabledOnPhone: false,
   kokoroVoiceId: 'af_heart',
 };
@@ -82,10 +84,16 @@ export function loadSettings(): AppSettings {
       ? (parsed.kokoroVoiceId as string)
       : DEFAULT_SETTINGS.kokoroVoiceId;
 
+    const deviceVoiceName =
+      typeof parsed.deviceVoiceName === 'string' && parsed.deviceVoiceName.trim().length > 0
+        ? parsed.deviceVoiceName.trim()
+        : null;
+
     return {
       autoRead: typeof parsed.autoRead === 'boolean' ? parsed.autoRead : DEFAULT_SETTINGS.autoRead,
       speechRate: rate,
       voiceOrder,
+      deviceVoiceName,
       kokoroEnabledOnPhone:
         typeof parsed.kokoroEnabledOnPhone === 'boolean'
           ? parsed.kokoroEnabledOnPhone

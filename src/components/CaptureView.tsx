@@ -22,7 +22,8 @@ type CaptureViewProps = {
   speechStatus: SpeechStatusSnapshot;
   lastVoiceUsed: VoiceProviderId | null;
   settings: AppSettings;
-  onUnlockGesture: () => void;
+  onUnlockCapture: () => void;
+  onUnlockPlayback: () => void;
   onPreparedPhoto: (photo: PreparedPhoto) => void;
   onDescribePrepared: (photo: PreparedPhoto, mode: PromptMode) => Promise<void>;
   onStatusAnnouncement: (message: string) => void;
@@ -41,7 +42,8 @@ export function CaptureView({
   speechStatus,
   lastVoiceUsed,
   settings,
-  onUnlockGesture,
+  onUnlockCapture,
+  onUnlockPlayback,
   onPreparedPhoto,
   onDescribePrepared,
   onStatusAnnouncement,
@@ -122,7 +124,7 @@ export function CaptureView({
 
   const handlePrimaryShutter = async (mode: PromptMode) => {
     if (busy) return;
-    onUnlockGesture();
+    onUnlockCapture();
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(25);
     }
@@ -169,7 +171,7 @@ export function CaptureView({
 
   const handleSamePhotoDescribe = async (mode: PromptMode) => {
     if (!preparedPhoto || busy) return;
-    onUnlockGesture();
+    onUnlockCapture();
     if (!online) {
       onStatusAnnouncement(strings.statusOfflineCannotDescribe);
       return;
@@ -182,7 +184,7 @@ export function CaptureView({
     if (speechStatus.speaking) {
       onTogglePause();
     } else {
-      onUnlockGesture();
+      onUnlockPlayback();
       onPlayResult(currentResult.text);
     }
   };
@@ -190,10 +192,11 @@ export function CaptureView({
   const activeModeLabel =
     currentResult?.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
 
+  const displayedProvider = speechStatus.activeProvider ?? lastVoiceUsed;
   const activeVoiceLabel =
-    lastVoiceUsed === 'kokoro'
+    displayedProvider === 'kokoro'
       ? strings.voiceKokoroLabel
-      : lastVoiceUsed === 'device'
+      : displayedProvider === 'device'
         ? strings.voiceDeviceLabel
         : null;
 
@@ -370,7 +373,7 @@ export function CaptureView({
                 {strings.describedWith} {currentResult.model}
               </p>
 
-              {/* Explicit playback buttons for VoiceOver, TalkBack, and keyboard navigation */}
+              {/* Explicit playback buttons — never speak "Describing" */}
               <div className="mt-4 flex flex-wrap gap-3">
                 {speechStatus.speaking ? (
                   <button
@@ -384,7 +387,7 @@ export function CaptureView({
                   <button
                     type="button"
                     onClick={() => {
-                      onUnlockGesture();
+                      onUnlockPlayback();
                       onPlayResult(currentResult.text);
                     }}
                     className="primary-cta min-h-[52px] flex-1 rounded-xl px-5 py-3 text-base font-bold"
@@ -396,7 +399,7 @@ export function CaptureView({
                 <button
                   type="button"
                   onClick={() => {
-                    onUnlockGesture();
+                    onUnlockPlayback();
                     onRepeat();
                   }}
                   className="surface-button min-h-[52px] rounded-xl border-2 px-5 py-3 text-base font-bold"

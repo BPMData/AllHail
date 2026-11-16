@@ -5,6 +5,7 @@ import { strings } from '../shared/strings.ts';
 import { CaptureView, type DescriptionResult } from './components/CaptureView.tsx';
 import { HistoryView } from './components/HistoryView.tsx';
 import { InfoSettingsView } from './components/InfoSettingsView.tsx';
+import { KokoroBanner } from './components/KokoroBanner.tsx';
 import {
   clearHistory,
   deleteHistoryEntry,
@@ -15,6 +16,7 @@ import {
 import type { PreparedPhoto } from './imagePrep.ts';
 import {
   detectDeviceClass,
+  KOKORO_VOICES,
   loadSettings,
   saveSettings,
   type AppSettings,
@@ -23,7 +25,11 @@ import {
 import { KokoroBrowserClient, type KokoroState } from './speech/kokoroClient.ts';
 import {
   createBrowserDeviceVoiceProvider,
+  getBrowserDeviceVoices,
+  getDeviceVoiceShortName,
+  resolveDeviceVoice,
   SpeechCoordinator,
+  subscribeBrowserDeviceVoices,
   type SpeechStatusSnapshot,
   type VoiceProviderId,
 } from './speech/speechCoordinator.ts';
@@ -34,6 +40,7 @@ export type AppProps = {
   coordinator?: SpeechCoordinator;
   kokoroClient?: KokoroBrowserClient;
   deviceClassOverride?: DeviceClass;
+  deviceVoicesOverride?: readonly SpeechSynthesisVoice[];
 };
 
 function createDefaultRuntime() {
@@ -53,11 +60,17 @@ function createDefaultRuntime() {
         }),
     },
     unlockAudioContext: () => kokoro.unlockAudioContext(),
+    playClickSound: () => kokoro.playSettingsClick(),
   });
   return { kokoro, coordinator };
 }
 
-export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKokoro, deviceClassOverride }: AppProps = {}) {
+export function App({
+  coordinator: injectedCoordinator,
+  kokoroClient: injectedKokoro,
+  deviceClassOverride,
+  deviceVoicesOverride,
+}: AppProps = {}) {
   const runtime = useMemo(() => {
     if (injectedCoordinator && injectedKokoro) {
       return { coordinator: injectedCoordinator, kokoro: injectedKokoro };
@@ -78,6 +91,9 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
   const [cacheError, setCacheError] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('camera');
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
+  const [deviceVoices, setDeviceVoices] = useState<readonly SpeechSynthesisVoice[]>(
+    () => deviceVoicesOverride ?? getBrowserDeviceVoices(),
+  );
   const [kokoroState, setKokoroState] = useState<KokoroState>(() => runtime.kokoro.getState());
   const [speechStatus, setSpeechStatus] = useState<SpeechStatusSnapshot>(() => runtime.coordinator.getStatus());
   const [lastVoiceUsed, setLastVoiceUsed] = useState<VoiceProviderId | null>(null);
@@ -86,9 +102,15 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
   const [preparedPhoto, setPreparedPhoto] = useState<PreparedPhoto | null>(null);
   const [currentResult, setCurrentResult] = useState<DescriptionResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [savedVisible, setSavedVisible] = useState(false);
+  const [savedAnnouncement, setSavedAnnouncement] = useState('');
+  const [voicePreviewMessage, setVoicePreviewMessage] = useState<string | null>(null);
 
   const userRequestedUpdate = useRef(false);
   const reloading = useRef(false);
+  const savedHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedSeqRef = useRef(0);
+  const kokoroAnnounceStageRef = useRef<'none' | 'start' | 'half' | 'done'>('none');
 
   const reloadOnce = () => {
     if (!reloading.current) {
@@ -121,13 +143,51 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
   }, []);
 
   useEffect(() => {
-    const unsubKokoro = runtime.kokoro.subscribe(setKokoroState);
-    const unsubSpeech = runtime.coordinator.subscribe(setSpeechStatus);
+    if (deviceVoicesOverride) {
+      setDeviceVoices(deviceVoicesOverride);
+      return;
+    }
+    return subscribeBrowserDeviceVoices(setDeviceVoices);
+  }, [deviceVoicesOverride]);
+
+  useEffect(() => {
+    const unsubKokoro = runtime.kokoro.subscribe((next) => {
+      setKokoroState(next);
+
+      // Throttled screen-reader announcements: ONLY start, 50%, and done/error.
+      if (next.status === 'downloading') {
+        if (kokoroAnnounceStageRef.current === 'none' || kokoroAnnounceStageRef.current === 'done') {
+          kokoroAnnounceStageRef.current = 'start';
+          setStatusMessage(strings.kokoroAnnounceStart);
+        } else if (next.progress >= 50 && kokoroAnnounceStageRef.current === 'start') {
+          kokoroAnnounceStageRef.current = 'half';
+          setStatusMessage(strings.kokoroAnnounceHalf);
+        }
+      } else if (next.status === 'ready') {
+        if (kokoroAnnounceStageRef.current === 'start' || kokoroAnnounceStageRef.current === 'half') {
+          kokoroAnnounceStageRef.current = 'done';
+          setStatusMessage(strings.kokoroAnnounceReady);
+        }
+      } else if (next.status === 'error') {
+        if (kokoroAnnounceStageRef.current !== 'done') {
+          kokoroAnnounceStageRef.current = 'done';
+          setStatusMessage(strings.kokoroStatusError);
+        }
+      } else if (next.status === 'idle') {
+        kokoroAnnounceStageRef.current = 'none';
+      }
+    });
+    const unsubSpeech = runtime.coordinator.subscribe((snapshot) => {
+      setSpeechStatus(snapshot);
+    });
     void listHistoryEntries().then(setHistory);
     return () => {
       unsubKokoro();
       unsubSpeech();
       runtime.coordinator.stop();
+      if (savedHideTimerRef.current !== null) {
+        clearTimeout(savedHideTimerRef.current);
+      }
     };
   }, [runtime]);
 
@@ -167,28 +227,134 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
     }
   };
 
-  const updateSettings = (patch: Partial<AppSettings>) => {
+  const triggerSavedFeedback = (customLiveNotice?: string) => {
+    runtime.coordinator.playSettingsClick();
+    setSavedVisible(true);
+    savedSeqRef.current += 1;
+    // Toggle briefly when repeated so screen readers still catch consecutive saves quietly.
+    const seq = savedSeqRef.current;
+    setSavedAnnouncement('');
+    queueMicrotask(() => {
+      if (savedSeqRef.current === seq) {
+        setSavedAnnouncement(customLiveNotice ?? strings.settingsSaved);
+      }
+    });
+
+    if (savedHideTimerRef.current !== null) {
+      clearTimeout(savedHideTimerRef.current);
+    }
+    savedHideTimerRef.current = setTimeout(() => {
+      setSavedVisible(false);
+    }, 3000);
+  };
+
+  const updateSettings = (patch: Partial<AppSettings>, customLiveNotice?: string) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
       saveSettings(next);
       return next;
     });
+    triggerSavedFeedback(customLiveNotice);
   };
 
-  const speakText = (text: string) => {
+  const deviceVoiceResolution = useMemo(
+    () =>
+      resolveDeviceVoice(deviceVoices, {
+        preferredVoiceName: settings.deviceVoiceName,
+        online,
+      }),
+    [deviceVoices, settings.deviceVoiceName, online],
+  );
+
+  const speakText = (text: string, rateOverride?: number, voiceOverride?: string) => {
     const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
-    const provider = runtime.coordinator.speakJob(text, {
+    const initial = runtime.coordinator.speakJob(text, {
       deviceClass,
       voiceOrder: settings.voiceOrder,
-      rate: settings.speechRate,
-      kokoroVoiceId: settings.kokoroVoiceId,
+      rate: rateOverride ?? settings.speechRate,
+      kokoroVoiceId: voiceOverride ?? settings.kokoroVoiceId,
+      deviceVoiceName: settings.deviceVoiceName,
+      online,
       kokoroAllowed,
+      kokoroTooSlow: kokoroState.tooSlow,
+      onProviderStarted: (provider) => {
+        setLastVoiceUsed(provider);
+      },
     });
-    setLastVoiceUsed(provider);
+    if (initial) {
+      setLastVoiceUsed(initial);
+    }
   };
 
-  const handleUnlockGesture = () => {
-    runtime.coordinator.unlockOnUserTap({ speakCue: settings.autoRead });
+  const handleSelectDeviceVoice = (voiceName: string | null) => {
+    const nextResolution = resolveDeviceVoice(deviceVoices, {
+      preferredVoiceName: voiceName,
+      online,
+    });
+    const unavailable = Boolean(voiceName && nextResolution.preferredMissing);
+    updateSettings(
+      { deviceVoiceName: voiceName },
+      unavailable ? strings.deviceVoiceUnavailable : undefined,
+    );
+
+    if (unavailable) {
+      return;
+    }
+
+    const pickedName = nextResolution.voice?.name ?? voiceName;
+    if (!pickedName) return;
+    const shortName = getDeviceVoiceShortName(pickedName);
+    const greeting = strings.deviceVoicePreviewTemplate.replace('{name}', shortName);
+    runtime.coordinator.unlockAudioOnly();
+    runtime.coordinator.speakJob(greeting, {
+      deviceClass,
+      voiceOrder: 'device-first',
+      rate: settings.speechRate,
+      kokoroVoiceId: settings.kokoroVoiceId,
+      deviceVoiceName: voiceName,
+      online,
+      forceProvider: 'device',
+    });
+  };
+
+  const handleSelectKokoroVoice = (voiceId: string) => {
+    const voiceMeta = KOKORO_VOICES.find((v) => v.id === voiceId) ?? KOKORO_VOICES[0];
+    const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
+    const kokoroReady = kokoroAllowed && runtime.kokoro.isReady();
+
+    if (!kokoroReady) {
+      const waitMessage = strings.kokoroPreviewNotReadyTemplate.replace('{name}', voiceMeta.shortName);
+      setVoicePreviewMessage(waitMessage);
+      updateSettings({ kokoroVoiceId: voiceId }, waitMessage);
+      return;
+    }
+
+    setVoicePreviewMessage(null);
+    updateSettings({ kokoroVoiceId: voiceId });
+
+    const greeting = strings.kokoroPreviewTemplate.replace('{name}', voiceMeta.shortName);
+    runtime.coordinator.unlockAudioOnly();
+    runtime.coordinator.speakJob(greeting, {
+      deviceClass,
+      voiceOrder: 'kokoro-first',
+      rate: settings.speechRate,
+      kokoroVoiceId: voiceId,
+      kokoroAllowed: true,
+      kokoroTooSlow: false,
+      forceProvider: 'kokoro',
+    });
+  };
+
+  const handleUnlockCapture = () => {
+    runtime.coordinator.unlockOnCaptureTap({
+      speakCue: settings.autoRead,
+      deviceVoiceName: settings.deviceVoiceName,
+      online,
+    });
+  };
+
+  const handleUnlockPlayback = () => {
+    runtime.coordinator.unlockAudioOnly();
   };
 
   const handleDescribePrepared = async (photo: PreparedPhoto, mode: PromptMode) => {
@@ -293,7 +459,7 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
       <a className="skip-link" href="#main">{strings.skipLink}</a>
 
       <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-8 lg:pb-12 lg:pt-8">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
           <div className="flex items-center gap-3">
             <img src="/icons/icon.svg" alt="" width="48" height="48" />
             <div>
@@ -323,6 +489,14 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
         </header>
 
         <main id="main" tabIndex={-1}>
+          {/* Visible Kokoro download banner directly under header on Camera screen */}
+          {activeTab === 'camera' && (
+            <KokoroBanner
+              kokoroState={kokoroState}
+              onRetry={() => runtime.kokoro.retryDownload()}
+            />
+          )}
+
           {/* Live status region: concise notices only, never contains description text */}
           <div
             role="status"
@@ -356,7 +530,8 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
               speechStatus={speechStatus}
               lastVoiceUsed={lastVoiceUsed}
               settings={settings}
-              onUnlockGesture={handleUnlockGesture}
+              onUnlockCapture={handleUnlockCapture}
+              onUnlockPlayback={handleUnlockPlayback}
               onPreparedPhoto={setPreparedPhoto}
               onDescribePrepared={handleDescribePrepared}
               onStatusAnnouncement={setStatusMessage}
@@ -372,7 +547,7 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
             <HistoryView
               entries={history}
               onPlayEntry={(entry) => {
-                handleUnlockGesture();
+                handleUnlockPlayback();
                 setCurrentResult(entry);
                 speakText(entry.text);
               }}
@@ -390,9 +565,16 @@ export function App({ coordinator: injectedCoordinator, kokoroClient: injectedKo
               deviceClass={deviceClass}
               online={online}
               settings={settings}
+              deviceVoices={deviceVoices}
+              deviceVoiceUnavailable={Boolean(settings.deviceVoiceName && deviceVoiceResolution.preferredMissing)}
               kokoroState={kokoroState}
               needRefresh={needRefresh}
+              savedVisible={savedVisible}
+              savedAnnouncement={savedAnnouncement}
+              voicePreviewMessage={voicePreviewMessage}
               onUpdateSettings={updateSettings}
+              onSelectDeviceVoice={handleSelectDeviceVoice}
+              onSelectKokoroVoice={handleSelectKokoroVoice}
               onRetryKokoro={() => runtime.kokoro.retryDownload()}
               onUpdateApp={() => void handleUpdate()}
             />

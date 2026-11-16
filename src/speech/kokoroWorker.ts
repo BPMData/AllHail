@@ -4,11 +4,26 @@ const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 
 type IncomingMessage =
   | { type: 'load' }
-  | { type: 'synthesize'; id: string; text: string; voice: string; speed: number };
+  | { type: 'cancelJob'; jobId: number }
+  | { type: 'synthesizeChunk'; jobId: number; chunkIndex: number; text: string; voice: string; speed: number };
 
 let ttsPromise: Promise<KokoroTTS> | null = null;
 let ttsInstance: KokoroTTS | null = null;
+let loadedTooSlow = false;
 const fileProgress = new Map<string, { loaded: number; total: number }>();
+const cancelledJobs = new Set<number>();
+
+export function hasAudiblePcm(samples: Float32Array | ArrayLike<number>): boolean {
+  if (!samples || samples.length === 0) return false;
+  let peak = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const v = samples[i];
+    if (!Number.isFinite(v)) return false;
+    const abs = Math.abs(v);
+    if (abs > peak) peak = abs;
+  }
+  return peak > 1e-5;
+}
 
 function reportProgress(event: {
   status?: string;
@@ -38,6 +53,30 @@ function reportProgress(event: {
   }
 }
 
+async function runCalibration(instance: KokoroTTS): Promise<boolean> {
+  try {
+    // Pass 1: warm up JIT/WASM allocations and discard timing.
+    await instance.generate('Warm up.', { voice: 'af_heart', speed: 1 });
+
+    // Pass 2: time a short calibration sentence against real-time audio duration.
+    const startedAt = performance.now();
+    const calibration = await instance.generate(
+      'AllHail helps students listen clearly.',
+      { voice: 'af_heart', speed: 1 },
+    );
+    const generationMs = performance.now() - startedAt;
+    const sampleRate = calibration.sampling_rate || 24000;
+    const audioMs = (calibration.audio.length / sampleRate) * 1000;
+
+    if (!hasAudiblePcm(calibration.audio) || audioMs <= 0) {
+      return true;
+    }
+    return generationMs > audioMs;
+  } catch {
+    return true;
+  }
+}
+
 async function loadModel(): Promise<KokoroTTS> {
   if (ttsInstance) return ttsInstance;
   if (ttsPromise) return ttsPromise;
@@ -45,34 +84,20 @@ async function loadModel(): Promise<KokoroTTS> {
   self.postMessage({ type: 'status', status: 'downloading', progress: 0 });
 
   ttsPromise = (async () => {
-    const preferWebGpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
     try {
+      // Only run q8 with device "wasm"; WebGPU q8 produces silent NaN tensors on Chrome.
       const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
         dtype: 'q8',
-        device: preferWebGpu ? 'webgpu' : 'wasm',
+        device: 'wasm',
         progress_callback: reportProgress,
       });
+      loadedTooSlow = await runCalibration(instance);
       ttsInstance = instance;
-      self.postMessage({ type: 'status', status: 'ready', progress: 100 });
+      self.postMessage({ type: 'status', status: 'ready', progress: 100, tooSlow: loadedTooSlow });
       return instance;
-    } catch (firstError) {
-      if (preferWebGpu) {
-        try {
-          const fallback = await KokoroTTS.from_pretrained(MODEL_ID, {
-            dtype: 'q8',
-            device: 'wasm',
-            progress_callback: reportProgress,
-          });
-          ttsInstance = fallback;
-          self.postMessage({ type: 'status', status: 'ready', progress: 100 });
-          return fallback;
-        } catch (secondError) {
-          ttsPromise = null;
-          throw secondError;
-        }
-      }
+    } catch (error) {
       ttsPromise = null;
-      throw firstError;
+      throw error;
     }
   })();
 
@@ -91,23 +116,39 @@ self.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
     return;
   }
 
-  if (data.type === 'synthesize') {
+  if (data.type === 'cancelJob') {
+    cancelledJobs.add(data.jobId);
+    if (cancelledJobs.size > 200) {
+      const oldest = cancelledJobs.values().next().value;
+      if (typeof oldest === 'number') cancelledJobs.delete(oldest);
+    }
+    return;
+  }
+
+  if (data.type === 'synthesizeChunk') {
+    if (cancelledJobs.has(data.jobId)) return;
     void (async () => {
       try {
         const tts = await loadModel();
+        if (cancelledJobs.has(data.jobId)) return;
         const audio = await tts.generate(data.text, {
           voice: data.voice as Parameters<KokoroTTS['generate']>[1] extends { voice?: infer V } ? V : never,
           speed: data.speed,
         });
+        if (cancelledJobs.has(data.jobId)) return;
         const samples = audio.audio instanceof Float32Array ? audio.audio : new Float32Array(audio.audio);
+        if (!hasAudiblePcm(samples)) {
+          throw new Error('Kokoro generated silent or invalid PCM samples');
+        }
         const sampleRate = audio.sampling_rate || 24000;
         self.postMessage(
-          { type: 'audio', id: data.id, samples, sampleRate },
+          { type: 'chunkAudio', jobId: data.jobId, chunkIndex: data.chunkIndex, samples, sampleRate },
           { transfer: [samples.buffer] },
         );
       } catch (error: unknown) {
+        if (cancelledJobs.has(data.jobId)) return;
         const message = error instanceof Error ? error.message : 'Kokoro synthesis failed';
-        self.postMessage({ type: 'audioError', id: data.id, error: message });
+        self.postMessage({ type: 'chunkError', jobId: data.jobId, chunkIndex: data.chunkIndex, error: message });
       }
     })();
   }
