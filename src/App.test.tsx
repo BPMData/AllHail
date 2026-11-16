@@ -1007,4 +1007,48 @@ describe('app accessibility, PWA feedback, and student mode', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('shows "Loading cached Kokoro voice" instead of "Downloading" on repeat reloads when cached', async () => {
+    const { coordinator, kokoroClient, piperClient } = makeTestRuntime();
+    render(
+      <App
+        coordinator={coordinator}
+        kokoroClient={kokoroClient}
+        piperClient={piperClient}
+        deviceClassOverride="laptop"
+        hasWebGpuAdapterOverride={async () => true}
+      />,
+    );
+
+    act(() => {
+      kokoroClient.setExternalState({
+        status: 'downloading',
+        progress: 0,
+        startedAt: Date.now(),
+        backend: 'webgpu',
+        sizeMb: 330,
+        cached: true,
+      });
+    });
+
+    const banner = screen.getByTestId('kokoro-banner');
+    expect(banner.textContent).toContain(strings.kokoroCachedBannerTitle);
+    expect(banner.textContent).not.toContain(strings.kokoroBannerTitle);
+    const liveStatus = screen.getByRole('status');
+    expect(liveStatus.textContent).toContain(strings.kokoroCachedAnnounceStart);
+
+    // Mid-load progress should NOT announce "Downloading the Kokoro voice: 50%"
+    act(() => {
+      kokoroClient.setExternalState({
+        status: 'downloading',
+        progress: 55,
+        cached: true,
+      });
+    });
+    expect(liveStatus.textContent).not.toContain(strings.kokoroAnnounceHalf);
+
+    // Settings view reflects cached loading wording cleanly
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    expect(screen.getByTestId('kokoro-status').textContent).toBe(`${strings.kokoroCachedStatusLoading} (55%)`);
+  });
 });

@@ -113,4 +113,25 @@ describe('KokoroBrowserClient sentence streaming queue', () => {
     expect(() => client.playSettingsClick()).not.toThrow();
     expect((ctx as unknown as { createOscillator: ReturnType<typeof vi.fn> }).createOscillator).toHaveBeenCalledTimes(1);
   });
+
+  it('sets cached: true on initial downloading state when model is already cached', async () => {
+    const postMessage = vi.fn();
+    const fakeWorker = {
+      addEventListener: vi.fn(),
+      postMessage,
+      terminate: vi.fn(),
+    } as unknown as Worker;
+
+    const client = new KokoroBrowserClient({
+      createWorker: () => fakeWorker,
+      isCached: async () => true,
+    });
+
+    client.startDownload();
+    await vi.waitFor(() => {
+      expect(client.getState().status).toBe('downloading');
+    });
+    expect(client.getState().cached).toBe(true);
+    expect(postMessage).toHaveBeenCalledWith({ type: 'load' });
+  });
 });

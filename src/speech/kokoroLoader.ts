@@ -21,10 +21,34 @@ export type KokoroLoadResult<TModel extends KokoroModelLike = KokoroModelLike> =
   instance: TModel;
   backend: KokoroBackend;
   sizeMb: number;
+  cached: boolean;
   tooSlow: boolean;
 };
 
 export const KOKORO_WEBGPU_SIZE_MB = 330;
+export const KOKORO_TRANSFORMERS_CACHE_NAME = 'transformers-cache';
+export const KOKORO_MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+
+export async function isKokoroModelCached({
+  cacheStorage = typeof caches !== 'undefined' ? caches : undefined,
+  modelId = KOKORO_MODEL_ID,
+}: {
+  cacheStorage?: Pick<CacheStorage, 'open'> & { has?: (cacheName: string) => Promise<boolean> };
+  modelId?: string;
+} = {}): Promise<boolean> {
+  if (!cacheStorage) return false;
+  try {
+    if (typeof cacheStorage.has === 'function') {
+      const exists = await cacheStorage.has(KOKORO_TRANSFORMERS_CACHE_NAME);
+      if (!exists) return false;
+    }
+    const cache = await cacheStorage.open(KOKORO_TRANSFORMERS_CACHE_NAME);
+    const requests = await cache.keys();
+    return requests.some((req) => req.url.includes(modelId) && /\.onnx(?:$|\?)/.test(req.url));
+  } catch {
+    return false;
+  }
+}
 
 export function hasAudiblePcm(samples: Float32Array | ArrayLike<number>): boolean {
   return isAudibleWaveform(samples);
@@ -59,13 +83,14 @@ export async function runKokoroCalibration<TModel extends KokoroModelLike>(
 
 export type LoadKokoroDeps<TModel extends KokoroModelLike> = {
   hasWebGpuAdapter: () => Promise<boolean>;
+  isCached?: () => Promise<boolean>;
   loadModel: (opts: {
     dtype: 'fp32';
     device: 'webgpu';
     progress_callback: (event: KokoroLoadProgress) => void;
   }) => Promise<TModel>;
-  onStageStart: (info: { backend: KokoroBackend; sizeMb: number }) => void;
-  onProgress: (event: KokoroLoadProgress, info: { backend: KokoroBackend; sizeMb: number }) => void;
+  onStageStart: (info: { backend: KokoroBackend; sizeMb: number; cached: boolean }) => void;
+  onProgress: (event: KokoroLoadProgress, info: { backend: KokoroBackend; sizeMb: number; cached: boolean }) => void;
   nowMs?: () => number;
 };
 
@@ -83,7 +108,8 @@ export async function loadKokoroWebGpu<TModel extends KokoroModelLike>(
     throw new Error('WebGPU adapter unavailable');
   }
 
-  const info = { backend: 'webgpu' as const, sizeMb: KOKORO_WEBGPU_SIZE_MB };
+  const cached = deps.isCached ? await deps.isCached().catch(() => false) : false;
+  const info = { backend: 'webgpu' as const, sizeMb: KOKORO_WEBGPU_SIZE_MB, cached };
   deps.onStageStart(info);
 
   const instance = await deps.loadModel({
@@ -101,6 +127,7 @@ export async function loadKokoroWebGpu<TModel extends KokoroModelLike>(
     instance,
     backend: 'webgpu',
     sizeMb: KOKORO_WEBGPU_SIZE_MB,
+    cached,
     tooSlow: cal.tooSlow,
   };
 }

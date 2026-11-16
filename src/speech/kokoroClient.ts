@@ -5,7 +5,7 @@ import {
   streamChunkedAudio,
   type SpeechControlHandle,
 } from './chunkAudioPlayer.ts';
-import type { KokoroBackend } from './kokoroLoader.ts';
+import { isKokoroModelCached, type KokoroBackend } from './kokoroLoader.ts';
 
 export type { SpeechControlHandle };
 export { isAudibleWaveform };
@@ -19,6 +19,7 @@ export type KokoroState = {
   startedAt: number | null;
   backend?: KokoroBackend;
   sizeMb?: number;
+  cached?: boolean;
   error?: string;
 };
 
@@ -38,6 +39,7 @@ type WorkerEvent =
       tooSlow?: boolean;
       backend?: KokoroBackend;
       sizeMb?: number;
+      cached?: boolean;
       error?: string;
     }
   | { type: 'chunkAudio'; jobId: number; chunkIndex: number; samples: Float32Array; sampleRate: number }
@@ -59,6 +61,7 @@ export type KokoroClientOptions = {
   createAudioContext?: () => AudioContext;
   audioManager?: SharedAudioContextManager;
   synthesizer?: KokoroSynthesizer;
+  isCached?: () => Promise<boolean>;
 };
 
 export class KokoroBrowserClient {
@@ -72,6 +75,7 @@ export class KokoroBrowserClient {
   >();
   private nextJobId = 1;
   private activeJobs = 0;
+  private startPending = false;
   private options: KokoroClientOptions;
 
   constructor(options: KokoroClientOptions = {}) {
@@ -84,7 +88,9 @@ export class KokoroBrowserClient {
   }
 
   isSupported(): boolean {
-    return Boolean(this.options.synthesizer) || typeof Worker !== 'undefined';
+    return (
+      Boolean(this.options.synthesizer || this.options.createWorker) || typeof Worker !== 'undefined'
+    );
   }
 
   isReady(): boolean {
@@ -105,11 +111,13 @@ export class KokoroBrowserClient {
   }
 
   markSkipped(): void {
+    this.startPending = false;
     if (this.state.status === 'skipped') return;
     this.setState({
       status: 'skipped',
       progress: 0,
       tooSlow: false,
+      cached: undefined,
       startedAt: null,
     });
   }
@@ -163,6 +171,7 @@ export class KokoroBrowserClient {
           startedAt,
           backend: msg.backend ?? this.state.backend,
           sizeMb: msg.sizeMb ?? this.state.sizeMb,
+          cached: typeof msg.cached === 'boolean' ? msg.cached : this.state.cached,
           error: msg.error,
         });
         return;
@@ -205,33 +214,48 @@ export class KokoroBrowserClient {
 
   startDownload(): void {
     if (!this.isSupported()) return;
-    if (this.state.status === 'ready' || this.state.status === 'downloading') return;
-    try {
-      this.setState({
-        status: 'downloading',
-        progress: 0,
-        tooSlow: false,
-        startedAt: Date.now(),
+    if (this.startPending || this.state.status === 'ready' || this.state.status === 'downloading') return;
+    this.startPending = true;
+    const checkCached = this.options.isCached ?? (() => isKokoroModelCached());
+
+    void checkCached()
+      .catch(() => false)
+      .then((cached) => {
+        if (!this.startPending || this.state.status !== 'idle') {
+          this.startPending = false;
+          return;
+        }
+        this.startPending = false;
+        try {
+          this.setState({
+            status: 'downloading',
+            progress: 0,
+            tooSlow: false,
+            cached,
+            startedAt: Date.now(),
+          });
+          const worker = this.ensureWorker();
+          worker.postMessage({ type: 'load' });
+        } catch (error) {
+          this.setState({
+            status: 'error',
+            progress: 0,
+            tooSlow: false,
+            cached,
+            startedAt: null,
+            error: error instanceof Error ? error.message : 'Unable to start Kokoro worker',
+          });
+        }
       });
-      const worker = this.ensureWorker();
-      worker.postMessage({ type: 'load' });
-    } catch (error) {
-      this.setState({
-        status: 'error',
-        progress: 0,
-        tooSlow: false,
-        startedAt: null,
-        error: error instanceof Error ? error.message : 'Unable to start Kokoro worker',
-      });
-    }
   }
 
   retryDownload(): void {
+    this.startPending = false;
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
-    this.setState({ status: 'idle', progress: 0, tooSlow: false, startedAt: null });
+    this.setState({ status: 'idle', progress: 0, tooSlow: false, cached: undefined, startedAt: null });
     this.startDownload();
   }
 

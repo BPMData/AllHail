@@ -202,10 +202,12 @@ export function App({
       if (next.status === 'downloading') {
         if (kokoroAnnounceStageRef.current === 'none' || kokoroAnnounceStageRef.current === 'done') {
           kokoroAnnounceStageRef.current = 'start';
-          setStatusMessage(strings.kokoroAnnounceStart);
+          setStatusMessage(next.cached ? strings.kokoroCachedAnnounceStart : strings.kokoroAnnounceStart);
         } else if (next.progress >= 50 && kokoroAnnounceStageRef.current === 'start') {
           kokoroAnnounceStageRef.current = 'half';
-          setStatusMessage(strings.kokoroAnnounceHalf);
+          if (!next.cached) {
+            setStatusMessage(strings.kokoroAnnounceHalf);
+          }
         }
       } else if (next.status === 'ready') {
         if (kokoroAnnounceStageRef.current === 'start' || kokoroAnnounceStageRef.current === 'half') {
@@ -836,7 +838,7 @@ export function App({
       <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-8 lg:pb-12 lg:pt-8">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
           <div className="flex items-center gap-3">
-            <img src="/icons/icon.svg" alt="" width="48" height="48" />
+            <img src="/icons/icon.svg" alt="" width="48" height="48" className="shrink-0 rounded-xl" />
             <div>
               <p className="text-2xl font-bold tracking-tight">{strings.appName}</p>
               <p className="text-sm opacity-85">{strings.suite}</p>

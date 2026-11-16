@@ -2,8 +2,8 @@
 
 :root {
   font-family: system-ui, sans-serif;
-  color: #153f35;
-  background: #f7f8f2;
+  color: #6e1d20;
+  background: #fbf9f9;
   font-synthesis: none;
   font-size: 18px;
   line-height: 1.65;
@@ -26,54 +26,54 @@ button {
 }
 
 :focus-visible {
-  outline: 4px solid #a54a00;
+  outline: 4px solid #8a3b00;
   outline-offset: 5px;
 }
 
 .status-panel {
-  background: #e6eee5;
-  border-color: #557361;
+  background: #f6e8e8;
+  border-color: #c76b69;
 }
 
 .panel-card {
   background: #ffffff;
-  border-color: #557361;
+  border-color: #c76b69;
 }
 
 .reader-surface {
-  background: #f7f8f2;
-  border-color: #557361;
-  color: #153f35;
+  background: #fbf9f9;
+  border-color: #c76b69;
+  color: #6e1d20;
 }
 
 .primary-cta,
 .update-button {
   color: #ffffff;
-  background: #153f35;
+  background: #6e1d20;
 }
 
 .secondary-cta {
-  color: #153f35;
-  background: #dfeee2;
-  border-color: #153f35;
+  color: #6e1d20;
+  background: #f6e8e8;
+  border-color: #6e1d20;
 }
 
 .surface-button {
-  color: #153f35;
+  color: #6e1d20;
   background: #ffffff;
-  border-color: #557361;
+  border-color: #c76b69;
 }
 
 .saved-badge {
-  color: #153f35;
-  background: #dfeee2;
-  border-color: #153f35;
+  color: #6e1d20;
+  background: #f6e8e8;
+  border-color: #6e1d20;
 }
 
 .danger-button {
   color: #ffffff;
   background: #b91c1c;
-  border-color: #991b1b;
+  border-color: #7f1d1d;
 }
 
 progress.kokoro-progress {
@@ -82,38 +82,38 @@ progress.kokoro-progress {
   height: 12px;
   min-height: 12px;
   border-radius: 9999px;
-  border: 2px solid #153f35;
-  background-color: #dfeee2;
+  border: 2px solid #6e1d20;
+  background-color: #f6e8e8;
   overflow: hidden;
 }
 
 progress.kokoro-progress::-webkit-progress-bar {
-  background-color: #dfeee2;
+  background-color: #f6e8e8;
   border-radius: 9999px;
 }
 
 progress.kokoro-progress::-webkit-progress-value {
-  background-color: #153f35;
+  background-color: #cc5856;
   border-radius: 9999px;
 }
 
 progress.kokoro-progress::-moz-progress-bar {
-  background-color: #153f35;
+  background-color: #cc5856;
   border-radius: 9999px;
 }
 
 .nav-bar {
-  background: rgba(247, 248, 242, 0.96);
-  border-color: #557361;
+  background: rgba(251, 249, 249, 0.96);
+  border-color: #c76b69;
 }
 
 .nav-tab-active {
   color: #ffffff;
-  background: #153f35;
+  background: #6e1d20;
 }
 
 .nav-tab-idle {
-  color: #153f35;
+  color: #6e1d20;
   background: transparent;
 }
 
@@ -123,7 +123,7 @@ progress.kokoro-progress::-moz-progress-bar {
   left: 12px;
   padding: 12px;
   background: #ffffff;
-  color: #153f35;
+  color: #6e1d20;
   z-index: 50;
   transform: translateY(-200%);
 }
@@ -134,52 +134,52 @@ progress.kokoro-progress::-moz-progress-bar {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    color: #eef5ed;
-    background: #12221e;
+    color: #faf4f4;
+    background: #1b1112;
   }
 
   :focus-visible {
-    outline-color: #ffca81;
+    outline-color: #ffd089;
   }
 
   .status-panel {
-    background: #203c32;
-    border-color: #9bc2ab;
+    background: #351f22;
+    border-color: #df8583;
   }
 
   .panel-card {
-    background: #172d27;
-    border-color: #9bc2ab;
+    background: #271719;
+    border-color: #df8583;
   }
 
   .reader-surface {
-    background: #12221e;
-    border-color: #9bc2ab;
-    color: #eef5ed;
+    background: #1b1112;
+    border-color: #df8583;
+    color: #faf4f4;
   }
 
   .primary-cta,
   .update-button {
-    background: #c6e4cb;
-    color: #12221e;
+    background: #f1b8b7;
+    color: #1b1112;
   }
 
   .secondary-cta {
-    background: #224438;
-    color: #eef5ed;
-    border-color: #c6e4cb;
+    background: #3a2124;
+    color: #faf4f4;
+    border-color: #f1b8b7;
   }
 
   .surface-button {
-    background: #1c352e;
-    color: #eef5ed;
-    border-color: #9bc2ab;
+    background: #2c1a1c;
+    color: #faf4f4;
+    border-color: #df8583;
   }
 
   .saved-badge {
-    color: #eef5ed;
-    background: #224438;
-    border-color: #c6e4cb;
+    color: #faf4f4;
+    background: #3a2124;
+    border-color: #f1b8b7;
   }
 
   .danger-button {
@@ -189,38 +189,38 @@ progress.kokoro-progress::-moz-progress-bar {
   }
 
   progress.kokoro-progress {
-    border-color: #c6e4cb;
-    background-color: #12221e;
+    border-color: #f1b8b7;
+    background-color: #1b1112;
   }
 
   progress.kokoro-progress::-webkit-progress-bar {
-    background-color: #12221e;
+    background-color: #1b1112;
   }
 
   progress.kokoro-progress::-webkit-progress-value {
-    background-color: #c6e4cb;
+    background-color: #e27d7b;
   }
 
   progress.kokoro-progress::-moz-progress-bar {
-    background-color: #c6e4cb;
+    background-color: #e27d7b;
   }
 
   .nav-bar {
-    background: rgba(18, 34, 30, 0.96);
-    border-color: #9bc2ab;
+    background: rgba(27, 17, 18, 0.96);
+    border-color: #df8583;
   }
 
   .nav-tab-active {
-    background: #c6e4cb;
-    color: #12221e;
+    background: #f1b8b7;
+    color: #1b1112;
   }
 
   .nav-tab-idle {
-    color: #eef5ed;
+    color: #faf4f4;
   }
 
   .skip-link {
-    background: #172d27;
-    color: #eef5ed;
+    background: #271719;
+    color: #faf4f4;
   }
 }

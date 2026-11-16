@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   hasAudiblePcm,
+  isKokoroModelCached,
   KOKORO_WEBGPU_SIZE_MB,
   loadKokoroWebGpu,
   type KokoroModelLike,
@@ -28,7 +29,7 @@ describe('hasAudiblePcm', () => {
 describe('loadKokoroWebGpu (WebGPU fp32 only, no WASM fallback)', () => {
   it('loads WebGPU fp32 (~330 MB), discards warm-up timing, and returns fast calibration result', async () => {
     let clockMs = 0;
-    const stages: Array<{ backend: string; sizeMb: number }> = [];
+    const stages: Array<{ backend: string; sizeMb: number; cached: boolean }> = [];
     const loadCalls: Array<{ dtype: string; device: string }> = [];
 
     const webgpuModel: KokoroModelLike = {
@@ -59,11 +60,48 @@ describe('loadKokoroWebGpu (WebGPU fp32 only, no WASM fallback)', () => {
     });
 
     expect(loadCalls).toEqual([{ dtype: 'fp32', device: 'webgpu' }]);
-    expect(stages).toEqual([{ backend: 'webgpu', sizeMb: KOKORO_WEBGPU_SIZE_MB }]);
+    expect(stages).toEqual([{ backend: 'webgpu', sizeMb: KOKORO_WEBGPU_SIZE_MB, cached: false }]);
     expect(result.backend).toBe('webgpu');
     expect(result.sizeMb).toBe(330);
+    expect(result.cached).toBe(false);
     expect(result.tooSlow).toBe(false);
     expect(webgpuModel.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('detects cached Kokoro ONNX weights in transformers-cache and propagates cached: true', async () => {
+    const fakeCacheStorage = {
+      has: vi.fn(async (name: string) => name === 'transformers-cache'),
+      open: vi.fn(async () => ({
+        keys: vi.fn(async () => [
+          { url: 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model.onnx' },
+        ]),
+      })),
+    } as unknown as Parameters<typeof isKokoroModelCached>[0] extends { cacheStorage?: infer C } ? C : never;
+
+    expect(await isKokoroModelCached({ cacheStorage: fakeCacheStorage })).toBe(true);
+
+    const partialCacheStorage = {
+      has: vi.fn(async () => true),
+      open: vi.fn(async () => ({
+        keys: vi.fn(async () => [
+          { url: 'https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/config.json' },
+        ]),
+      })),
+    } as unknown as Parameters<typeof isKokoroModelCached>[0] extends { cacheStorage?: infer C } ? C : never;
+
+    expect(await isKokoroModelCached({ cacheStorage: partialCacheStorage })).toBe(false);
+
+    const stages: Array<{ backend: string; sizeMb: number; cached: boolean }> = [];
+    const model: KokoroModelLike = { generate: vi.fn(async () => makeAudio(24000, 0.2)) };
+    const result = await loadKokoroWebGpu({
+      hasWebGpuAdapter: async () => true,
+      isCached: async () => true,
+      loadModel: async () => model,
+      onStageStart: (info) => stages.push(info),
+      onProgress: vi.fn(),
+    });
+    expect(stages).toEqual([{ backend: 'webgpu', sizeMb: KOKORO_WEBGPU_SIZE_MB, cached: true }]);
+    expect(result.cached).toBe(true);
   });
 
   it('rejects immediately without calling loadModel or any wasm/q8 fallback when no WebGPU adapter exists', async () => {

@@ -75,7 +75,10 @@ export function InfoSettingsView({
       return kokoroState.tooSlow ? strings.kokoroTooSlow : strings.kokoroStatusReady;
     }
     if (kokoroState.status === 'downloading') {
-      return `${strings.kokoroStatusDownloading} (${kokoroState.progress}%)`;
+      const label = kokoroState.cached
+        ? strings.kokoroCachedStatusLoading
+        : strings.kokoroStatusDownloading;
+      return `${label} (${kokoroState.progress}%)`;
     }
     if (kokoroState.status === 'error') return strings.kokoroStatusError;
     if (!online) return strings.kokoroStatusWaitingOnline;
@@ -152,7 +155,7 @@ export function InfoSettingsView({
               type="checkbox"
               checked={settings.autoRead}
               onChange={(e) => onUpdateSettings({ autoRead: e.target.checked })}
-              className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+              className="mt-1 h-6 w-6 shrink-0 accent-[#6e1d20]"
             />
             <span>
               <span className="block text-lg font-bold">{strings.autoReadLabel}</span>
@@ -168,7 +171,7 @@ export function InfoSettingsView({
               type="checkbox"
               checked={settings.disableEditing}
               onChange={(e) => onUpdateSettings({ disableEditing: e.target.checked })}
-              className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+              className="mt-1 h-6 w-6 shrink-0 accent-[#6e1d20]"
             />
             <span>
               <span className="block text-lg font-bold">{strings.disableEditingLabel}</span>
@@ -264,7 +267,7 @@ export function InfoSettingsView({
                 type="checkbox"
                 checked={settings.kokoroEnabledOnPhone}
                 onChange={(e) => onUpdateSettings({ kokoroEnabledOnPhone: e.target.checked })}
-                className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+                className="mt-1 h-6 w-6 shrink-0 accent-[#6e1d20]"
               />
               <span className="text-lg font-bold">{strings.kokoroEnablePhoneLabel}</span>
             </label>
@@ -333,7 +336,7 @@ export function InfoSettingsView({
                 type="checkbox"
                 checked={settings.piperEnabledOnPhone}
                 onChange={(e) => onUpdateSettings({ piperEnabledOnPhone: e.target.checked })}
-                className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+                className="mt-1 h-6 w-6 shrink-0 accent-[#6e1d20]"
               />
               <span className="text-lg font-bold">{piperEnablePhoneLabel}</span>
             </label>

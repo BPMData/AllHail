@@ -2,6 +2,8 @@ import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
 import {
   hasAudiblePcm,
+  isKokoroModelCached,
+  KOKORO_MODEL_ID,
   loadKokoroWebGpu,
   type KokoroBackend,
   type KokoroLoadProgress,
@@ -11,8 +13,6 @@ import {
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.wasmPaths = '/ort/';
 }
-
-const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 
 type IncomingMessage =
   | { type: 'load' }
@@ -26,7 +26,7 @@ const cancelledJobs = new Set<number>();
 
 function reportProgress(
   event: KokoroLoadProgress,
-  info: { backend: KokoroBackend; sizeMb: number },
+  info: { backend: KokoroBackend; sizeMb: number; cached: boolean },
 ) {
   if (event.file && typeof event.loaded === 'number' && typeof event.total === 'number' && event.total > 0) {
     fileProgress.set(event.file, { loaded: event.loaded, total: event.total });
@@ -43,6 +43,7 @@ function reportProgress(
       progress: pct,
       backend: info.backend,
       sizeMb: info.sizeMb,
+      cached: info.cached,
     });
     return;
   }
@@ -53,6 +54,7 @@ function reportProgress(
       progress: Math.min(99, Math.max(0, Math.round(event.progress))),
       backend: info.backend,
       sizeMb: info.sizeMb,
+      cached: info.cached,
     });
   }
 }
@@ -76,13 +78,14 @@ async function loadModel(): Promise<KokoroTTS> {
     try {
       const loaded = await loadKokoroWebGpu<KokoroTTS>({
         hasWebGpuAdapter: detectWebGpuAdapter,
+        isCached: () => isKokoroModelCached({ modelId: KOKORO_MODEL_ID }),
         loadModel: ({ dtype, device, progress_callback }) =>
-          KokoroTTS.from_pretrained(MODEL_ID, {
+          KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
             dtype,
             device,
             progress_callback,
           }),
-        onStageStart: ({ backend, sizeMb }) => {
+        onStageStart: ({ backend, sizeMb, cached }) => {
           fileProgress.clear();
           self.postMessage({
             type: 'status',
@@ -90,6 +93,7 @@ async function loadModel(): Promise<KokoroTTS> {
             progress: 0,
             backend,
             sizeMb,
+            cached,
           });
         },
         onProgress: reportProgress,
@@ -102,6 +106,7 @@ async function loadModel(): Promise<KokoroTTS> {
         progress: 100,
         backend: loaded.backend,
         sizeMb: loaded.sizeMb,
+        cached: loaded.cached,
         tooSlow: loaded.tooSlow,
       });
       return loaded.instance;

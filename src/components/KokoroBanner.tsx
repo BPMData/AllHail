@@ -85,7 +85,9 @@ export function KokoroBanner({
   const bannerTitle =
     activeDownload!.kind === 'piper'
       ? strings.piperBannerTitleTemplate.replace('{size}', String(activeDownload!.state.sizeMb))
-      : strings.kokoroBannerTitle;
+      : activeDownload!.state.cached
+        ? strings.kokoroCachedBannerTitle
+        : strings.kokoroBannerTitle;
   const progressLabel =
     activeDownload!.kind === 'piper' ? strings.piperProgressLabel : strings.kokoroProgressLabel;
 
