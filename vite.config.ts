@@ -2,9 +2,19 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import {
+  measurePiperDownloadSize,
+  syncSelfHostedRuntimes,
+  verifySingleOnnxRuntime,
+} from './scripts/runtimeAssets.mjs';
 import { strings } from './shared/strings.ts';
 
+const initialPiperSize = measurePiperDownloadSize(process.cwd());
+
 export default defineConfig({
+  define: {
+    __PIPER_DOWNLOAD_SIZE_MB__: JSON.stringify(initialPiperSize.sizeMb),
+  },
   worker: {
     format: 'es',
   },
@@ -15,6 +25,20 @@ export default defineConfig({
     hmr: false,
   },
   plugins: [
+    {
+      name: 'allhail-self-hosted-runtimes',
+      configureServer() {
+        syncSelfHostedRuntimes(process.cwd());
+        verifySingleOnnxRuntime(process.cwd(), { checkDist: false });
+      },
+      buildStart() {
+        syncSelfHostedRuntimes(process.cwd());
+        verifySingleOnnxRuntime(process.cwd(), { checkDist: false });
+      },
+      closeBundle() {
+        verifySingleOnnxRuntime(process.cwd(), { checkDist: true });
+      },
+    },
     react(),
     tailwindcss(),
     {
@@ -31,7 +55,7 @@ export default defineConfig({
     VitePWA({
       // Ask before updating, so future speech jobs and edits aren't interrupted.
       registerType: 'prompt',
-      includeAssets: ['icons/*'],
+      includeAssets: ['icons/*', 'CREDITS.md'],
       manifest: {
         id: '/',
         name: strings.appName,
@@ -51,12 +75,25 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
+        globIgnores: ['ort/**', 'piper/**'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
-        // Only build assets are cached. API replies and user content stay out.
-        runtimeCaching: [],
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/(?:ort|piper)(?:\/|$)/, /^\/CREDITS\.md$/],
+        // Cache self-hosted /ort/ and /piper/ files strictly on demand, never on initial install.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/piper/') || url.pathname.startsWith('/ort/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'allhail-piper-runtime',
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
     }),
   ],

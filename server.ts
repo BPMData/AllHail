@@ -69,6 +69,9 @@ export async function createApp({
   } else {
     const { createServer } = await import('vite');
     const vite = await createServer({ root, server: { middlewareMode: true }, appType: 'spa' });
+    // Serve self-hosted ONNX and Piper runtimes directly so Vite does not reject dynamic .mjs imports from /public.
+    app.use('/ort', express.static(resolve(root, 'public/ort')));
+    app.use('/piper', express.static(resolve(root, 'public/piper')));
     app.use(vite.middlewares);
   }
 

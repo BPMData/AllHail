@@ -23,3 +23,8 @@ package-lock.json
 
 # Deep-research reports: kept locally, not committed
 research_outputs/
+
+# Self-hosted ONNX & Piper runtime binaries copied from node_modules at dev/build time
+public/ort/
+public/piper/
+public/CREDITS.md

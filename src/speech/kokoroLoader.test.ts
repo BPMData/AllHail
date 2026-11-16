@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   hasAudiblePcm,
-  loadKokoroWithFallback,
+  KOKORO_WEBGPU_SIZE_MB,
+  loadKokoroWebGpu,
   type KokoroModelLike,
 } from './kokoroLoader.ts';
 
@@ -24,8 +25,8 @@ describe('hasAudiblePcm', () => {
   });
 });
 
-describe('loadKokoroWithFallback', () => {
-  it('prefers WebGPU fp32 (~330 MB) first, ignores slow warm-up timing, and stays fast', async () => {
+describe('loadKokoroWebGpu (WebGPU fp32 only, no WASM fallback)', () => {
+  it('loads WebGPU fp32 (~330 MB), discards warm-up timing, and returns fast calibration result', async () => {
     let clockMs = 0;
     const stages: Array<{ backend: string; sizeMb: number }> = [];
     const loadCalls: Array<{ dtype: string; device: string }> = [];
@@ -33,7 +34,7 @@ describe('loadKokoroWithFallback', () => {
     const webgpuModel: KokoroModelLike = {
       generate: vi
         .fn()
-        // Pass 1: slow warm-up (5000 ms) should be discarded
+        // Pass 1: slow warm-up (5000 ms) must be discarded
         .mockImplementationOnce(async () => {
           clockMs += 5000;
           return makeAudio(24000, 0.2); // 1000 ms audio
@@ -45,7 +46,7 @@ describe('loadKokoroWithFallback', () => {
         }),
     };
 
-    const result = await loadKokoroWithFallback({
+    const result = await loadKokoroWebGpu({
       hasWebGpuAdapter: async () => true,
       loadModel: async (opts) => {
         loadCalls.push({ dtype: opts.dtype, device: opts.device });
@@ -58,86 +59,68 @@ describe('loadKokoroWithFallback', () => {
     });
 
     expect(loadCalls).toEqual([{ dtype: 'fp32', device: 'webgpu' }]);
-    expect(stages).toEqual([{ backend: 'webgpu', sizeMb: 330 }]);
+    expect(stages).toEqual([{ backend: 'webgpu', sizeMb: KOKORO_WEBGPU_SIZE_MB }]);
     expect(result.backend).toBe('webgpu');
     expect(result.sizeMb).toBe(330);
     expect(result.tooSlow).toBe(false);
     expect(webgpuModel.generate).toHaveBeenCalledTimes(2);
   });
 
-  it('falls back to WASM q8 (~90 MB) when WebGPU fp32 produces silent PCM and flags slow CPUs', async () => {
-    let clockMs = 0;
-    const stages: Array<{ backend: string; sizeMb: number }> = [];
-    const loadCalls: Array<{ dtype: string; device: string }> = [];
+  it('rejects immediately without calling loadModel or any wasm/q8 fallback when no WebGPU adapter exists', async () => {
+    const loadModel = vi.fn();
+    const onStageStart = vi.fn();
 
+    await expect(
+      loadKokoroWebGpu({
+        hasWebGpuAdapter: async () => false,
+        loadModel,
+        onStageStart,
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow(/WebGPU adapter unavailable/);
+
+    expect(loadModel).not.toHaveBeenCalled();
+    expect(onStageStart).not.toHaveBeenCalled();
+  });
+
+  it('rejects silent WebGPU output without falling back to WASM q8 and flags slow WebGPU devices cleanly', async () => {
     const silentWebGpu: KokoroModelLike = {
-      generate: vi.fn(async () => makeAudio(24000, 0)), // all zeros
+      generate: vi.fn(async () => makeAudio(24000, 0)),
     };
+    const loadSilent = vi.fn(async () => silentWebGpu);
 
-    const slowWasm: KokoroModelLike = {
+    await expect(
+      loadKokoroWebGpu({
+        hasWebGpuAdapter: async () => true,
+        loadModel: loadSilent,
+        onStageStart: vi.fn(),
+        onProgress: vi.fn(),
+      }),
+    ).rejects.toThrow(/silent or invalid PCM/);
+    expect(loadSilent).toHaveBeenCalledTimes(1);
+
+    let clockMs = 0;
+    const slowWebGpu: KokoroModelLike = {
       generate: vi
         .fn()
-        // Warm-up
         .mockImplementationOnce(async () => {
-          clockMs += 4000;
+          clockMs += 3000;
           return makeAudio(24000, 0.2);
         })
-        // Calibration: 2400 ms to produce 1000 ms of audio => slower than real time
         .mockImplementationOnce(async () => {
-          clockMs += 2400;
+          clockMs += 1500; // slower than 1000 ms audio
           return makeAudio(24000, 0.2);
         }),
     };
 
-    const result = await loadKokoroWithFallback({
+    const slowResult = await loadKokoroWebGpu({
       hasWebGpuAdapter: async () => true,
-      loadModel: async (opts) => {
-        loadCalls.push({ dtype: opts.dtype, device: opts.device });
-        return opts.device === 'webgpu' ? silentWebGpu : slowWasm;
-      },
-      onStageStart: (info) => stages.push(info),
-      onProgress: vi.fn(),
-      nowMs: () => clockMs,
-    });
-
-    expect(loadCalls).toEqual([
-      { dtype: 'fp32', device: 'webgpu' },
-      { dtype: 'q8', device: 'wasm' },
-    ]);
-    expect(stages).toEqual([
-      { backend: 'webgpu', sizeMb: 330 },
-      { backend: 'wasm', sizeMb: 90 },
-    ]);
-    expect(result.backend).toBe('wasm');
-    expect(result.sizeMb).toBe(90);
-    expect(result.tooSlow).toBe(true);
-  });
-
-  it('skips WebGPU and loads WASM q8 directly when no WebGPU adapter is available', async () => {
-    const loadCalls: Array<{ dtype: string; device: string }> = [];
-    let clockMs = 0;
-
-    const fastWasm: KokoroModelLike = {
-      generate: vi.fn(async () => {
-        clockMs += 300;
-        return makeAudio(24000, 0.2);
-      }),
-    };
-
-    const result = await loadKokoroWithFallback({
-      hasWebGpuAdapter: async () => false,
-      loadModel: async (opts) => {
-        loadCalls.push({ dtype: opts.dtype, device: opts.device });
-        return fastWasm;
-      },
+      loadModel: async () => slowWebGpu,
       onStageStart: vi.fn(),
       onProgress: vi.fn(),
       nowMs: () => clockMs,
     });
-
-    expect(loadCalls).toEqual([{ dtype: 'q8', device: 'wasm' }]);
-    expect(result.backend).toBe('wasm');
-    expect(result.sizeMb).toBe(90);
-    expect(result.tooSlow).toBe(false);
+    expect(slowResult.backend).toBe('webgpu');
+    expect(slowResult.tooSlow).toBe(true);
   });
 });

@@ -1,9 +1,9 @@
 import { cleanTextForSpeech } from '../../shared/speechCleaner.ts';
 import { strings } from '../../shared/strings.ts';
 import type { DeviceClass, VoiceOrderPreference } from '../settings.ts';
-import type { SpeechControlHandle } from './kokoroClient.ts';
+import type { SpeechControlHandle } from './chunkAudioPlayer.ts';
 
-export type VoiceProviderId = 'device' | 'kokoro';
+export type VoiceProviderId = 'device' | 'kokoro' | 'piper';
 
 export type SpeakCallbacks = {
   rate: number;
@@ -18,10 +18,12 @@ export type SpeakCallbacks = {
 export type VoiceProvider = {
   id: VoiceProviderId;
   isReady: () => boolean;
+  isBusy?: () => boolean;
   speak: (cleanedText: string, callbacks: SpeakCallbacks) => SpeechControlHandle;
 };
 
-export const KOKORO_FIRST_AUDIO_TIMEOUT_MS = 4000;
+export const FIRST_AUDIO_TIMEOUT_MS = 4000;
+export const KOKORO_FIRST_AUDIO_TIMEOUT_MS = FIRST_AUDIO_TIMEOUT_MS;
 
 const NOVELTY_VOICES = new Set([
   'albert',
@@ -228,11 +230,54 @@ export function resolveVoiceOrder(
   deviceClass: DeviceClass,
   preference: VoiceOrderPreference,
   kokoroTooSlow = false,
+  piperTooSlow = false,
 ): readonly VoiceProviderId[] {
-  if (preference === 'device-first') return ['device', 'kokoro'];
-  if (preference === 'kokoro-first') return ['kokoro', 'device'];
-  if (kokoroTooSlow) return ['device', 'kokoro'];
-  return deviceClass === 'phone' ? ['device', 'kokoro'] : ['kokoro', 'device'];
+  let base: readonly VoiceProviderId[];
+  if (preference === 'device-first') {
+    base = ['device', 'kokoro', 'piper'];
+  } else if (preference === 'kokoro-first') {
+    base = ['kokoro', 'piper', 'device'];
+  } else if (preference === 'piper-first') {
+    base = ['piper', 'kokoro', 'device'];
+  } else if (deviceClass === 'phone') {
+    base = ['device', 'piper', 'kokoro'];
+  } else {
+    base = ['kokoro', 'piper', 'device'];
+  }
+
+  return base.filter((id) => {
+    if (id === 'kokoro' && kokoroTooSlow) return false;
+    if (id === 'piper' && piperTooSlow) return false;
+    return true;
+  });
+}
+
+export function resolveActiveVoiceId({
+  deviceClass,
+  voiceOrder,
+  kokoroReady,
+  kokoroAllowed,
+  kokoroTooSlow,
+  piperReady,
+  piperAllowed,
+  piperTooSlow,
+}: {
+  deviceClass: DeviceClass;
+  voiceOrder: VoiceOrderPreference;
+  kokoroReady: boolean;
+  kokoroAllowed: boolean;
+  kokoroTooSlow: boolean;
+  piperReady: boolean;
+  piperAllowed: boolean;
+  piperTooSlow: boolean;
+}): VoiceProviderId {
+  const order = resolveVoiceOrder(deviceClass, voiceOrder, kokoroTooSlow, piperTooSlow);
+  for (const id of order) {
+    if (id === 'kokoro' && kokoroAllowed && kokoroReady) return 'kokoro';
+    if (id === 'piper' && piperAllowed && piperReady) return 'piper';
+    if (id === 'device') return 'device';
+  }
+  return 'device';
 }
 
 // Keep strong references so Chrome/Safari GC never collects utterances mid-speech.
@@ -325,7 +370,6 @@ export function createBrowserDeviceVoiceProvider(options?: {
     'speechSynthesis' in window &&
     typeof SpeechSynthesisUtterance !== 'undefined';
 
-  // Trigger initial voice list loading once and keep it warm when voiceschanged fires.
   if (hasSynth()) {
     window.speechSynthesis.getVoices?.();
     if (typeof window.speechSynthesis.addEventListener === 'function') {
@@ -363,7 +407,6 @@ export function createBrowserDeviceVoiceProvider(options?: {
         synth.cancel();
       }
 
-      // Send the full text as ONE utterance with zero chunk splitting and no keepalive timers.
       const speakSingleUtterance = (voices: readonly SpeechSynthesisVoice[]) => {
         if (stopped) return;
         const online =
@@ -411,7 +454,6 @@ export function createBrowserDeviceVoiceProvider(options?: {
           speakSingleUtterance(loadedVoices);
         });
       } else if (wasActive) {
-        // Avoid Chrome's synchronous cancel()-then-speak() drop bug when interrupting active speech.
         pendingStartTimer = setTimeout(() => {
           pendingStartTimer = null;
           speakSingleUtterance(typeof synth.getVoices === 'function' ? synth.getVoices() : initialVoices);
@@ -458,10 +500,20 @@ export type UnlockCueOptions = {
 export type CoordinatorDeps = {
   deviceProvider: VoiceProvider;
   kokoroProvider: VoiceProvider;
+  piperProvider?: VoiceProvider;
   unlockAudioContext: () => void;
   playClickSound?: () => void;
   unlockDeviceCue?: (cueText: string, options?: UnlockCueOptions) => void;
   firstAudioTimeoutMs?: number;
+};
+
+const unreadyPiperStub: VoiceProvider = {
+  id: 'piper',
+  isReady: () => false,
+  speak: (_text, callbacks) => {
+    queueMicrotask(() => callbacks.onError?.(new Error('Piper provider unavailable')));
+    return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
+  },
 };
 
 export function createDefaultUnlockCue(): (cueText: string, options?: UnlockCueOptions) => void {
@@ -540,10 +592,6 @@ export class SpeechCoordinator {
     }
   }
 
-  /**
-   * Synchronously unlocks iOS speechSynthesis & Web AudioContext inside capture
-   * shutter tap handlers (speaks short "Describing" cue using the chosen/automatic device voice).
-   */
   unlockOnCaptureTap({
     speakCue,
     deviceVoiceName,
@@ -561,10 +609,6 @@ export class SpeechCoordinator {
     }
   }
 
-  /**
-   * Silently unlocks/resumes Web AudioContext for playback & preview taps without
-   * speaking "Describing".
-   */
   unlockAudioOnly(): void {
     this.deps.unlockAudioContext();
   }
@@ -585,6 +629,8 @@ export class SpeechCoordinator {
       online,
       kokoroAllowed = true,
       kokoroTooSlow = false,
+      piperAllowed = true,
+      piperTooSlow = false,
       forceProvider,
       onProviderStarted,
     }: {
@@ -596,6 +642,8 @@ export class SpeechCoordinator {
       online?: boolean;
       kokoroAllowed?: boolean;
       kokoroTooSlow?: boolean;
+      piperAllowed?: boolean;
+      piperTooSlow?: boolean;
       forceProvider?: VoiceProviderId;
       onProviderStarted?: (provider: VoiceProviderId) => void;
     },
@@ -608,16 +656,18 @@ export class SpeechCoordinator {
     const providersById: Record<VoiceProviderId, VoiceProvider> = {
       device: this.deps.deviceProvider,
       kokoro: this.deps.kokoroProvider,
+      piper: this.deps.piperProvider ?? unreadyPiperStub,
     };
 
     const order: readonly VoiceProviderId[] = forceProvider
       ? [forceProvider]
-      : resolveVoiceOrder(deviceClass, voiceOrder, kokoroTooSlow);
+      : resolveVoiceOrder(deviceClass, voiceOrder, kokoroTooSlow, piperTooSlow);
 
     const readyChain = order
       .map((id) => providersById[id])
       .filter((provider) => {
-        if (provider.id === 'kokoro' && !kokoroAllowed) return false;
+        if (provider.id === 'kokoro' && (!kokoroAllowed || kokoroTooSlow)) return false;
+        if (provider.id === 'piper' && (!piperAllowed || piperTooSlow)) return false;
         return provider.isReady();
       });
 
@@ -626,13 +676,26 @@ export class SpeechCoordinator {
       return null;
     }
 
-    const firstAudioTimeoutMs = this.deps.firstAudioTimeoutMs ?? KOKORO_FIRST_AUDIO_TIMEOUT_MS;
-    // Lock one voice per job: once a provider starts audible playback, never switch mid-job.
+    const firstAudioTimeoutMs = this.deps.firstAudioTimeoutMs ?? FIRST_AUDIO_TIMEOUT_MS;
     let started = false;
+    let watchdogUsedForJob = false;
     let index = 0;
 
-    const tryNext = (): VoiceProviderId | null => {
+    const tryNext = (afterTimeout = false): VoiceProviderId | null => {
       this.clearWatchdog();
+
+      if (afterTimeout) {
+        // After a 4-second first-audio timeout, jump straight to device voice unless the
+        // next offline voice is already ready, calibrated fast, and idle (total silence < 5s).
+        while (index < readyChain.length) {
+          const candidate = readyChain[index];
+          if (candidate.id === 'device') break;
+          const busy = candidate.isBusy?.() ?? false;
+          if (candidate.isReady() && !busy) break;
+          index += 1;
+        }
+      }
+
       if (jobId !== this.activeJobId || index >= readyChain.length) {
         if (jobId === this.activeJobId) {
           this.activeHandle = null;
@@ -650,8 +713,9 @@ export class SpeechCoordinator {
         activeProvider: provider.id,
       });
 
-      // Start the 4-second first-audio timeout whenever trying Kokoro with another provider behind it.
-      if (provider.id === 'kokoro' && index < readyChain.length) {
+      // Arm the 4-second first-audio watchdog ONLY for the first offline voice tried in a job.
+      if (!watchdogUsedForJob && provider.id !== 'device' && index < readyChain.length) {
+        watchdogUsedForJob = true;
         this.watchdogTimer = setTimeout(() => {
           this.watchdogTimer = null;
           if (jobId !== this.activeJobId || started) return;
@@ -659,7 +723,7 @@ export class SpeechCoordinator {
           const handleToCancel = this.activeHandle;
           this.activeHandle = null;
           handleToCancel?.stop();
-          tryNext();
+          tryNext(true);
         }, firstAudioTimeoutMs);
       }
 
@@ -691,7 +755,7 @@ export class SpeechCoordinator {
             this.clearWatchdog();
             this.activeHandle = null;
             if (!started && index < readyChain.length) {
-              tryNext();
+              tryNext(false);
               return;
             }
             this.updateSnapshot({ speaking: false, paused: false, activeProvider: null });
@@ -707,14 +771,14 @@ export class SpeechCoordinator {
         this.clearWatchdog();
         this.activeHandle = null;
         if (!started && index < readyChain.length) {
-          return tryNext();
+          return tryNext(false);
         }
         this.updateSnapshot({ speaking: false, paused: false, activeProvider: null });
         return null;
       }
     };
 
-    return tryNext();
+    return tryNext(false);
   }
 
   pause(): void {

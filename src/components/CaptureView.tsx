@@ -196,9 +196,11 @@ export function CaptureView({
   const activeVoiceLabel =
     displayedProvider === 'kokoro'
       ? strings.voiceKokoroLabel
-      : displayedProvider === 'device'
-        ? strings.voiceDeviceLabel
-        : null;
+      : displayedProvider === 'piper'
+        ? strings.voicePiperLabel
+        : displayedProvider === 'device'
+          ? strings.voiceDeviceLabel
+          : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 lg:items-start">

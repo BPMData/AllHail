@@ -11,9 +11,9 @@ import {
 } from './speechCoordinator.ts';
 
 function fakeProvider(
-  id: 'device' | 'kokoro',
+  id: 'device' | 'kokoro' | 'piper',
   ready: boolean,
-  options?: { failBeforeStart?: boolean; stallStart?: boolean },
+  options?: { failBeforeStart?: boolean; stallStart?: boolean; busy?: boolean },
 ): VoiceProvider & { calls: string[]; stopSpies: ReturnType<typeof vi.fn>[] } {
   const calls: string[] = [];
   const stopSpies: ReturnType<typeof vi.fn>[] = [];
@@ -22,6 +22,7 @@ function fakeProvider(
     calls,
     stopSpies,
     isReady: () => ready,
+    isBusy: () => Boolean(options?.busy),
     speak: (text, callbacks) => {
       calls.push(text);
       const stop = vi.fn();
@@ -56,12 +57,14 @@ afterEach(() => {
 });
 
 describe('SpeechCoordinator', () => {
-  it('uses device voice first on phones and kokoro first on laptops when ready and fast', () => {
+  it('uses device voice first on phones and kokoro -> piper -> device on laptops', () => {
     const device = fakeProvider('device', true);
     const kokoro = fakeProvider('kokoro', true);
+    const piper = fakeProvider('piper', true);
     const coordinator = new SpeechCoordinator({
       deviceProvider: device,
       kokoroProvider: kokoro,
+      piperProvider: piper,
       unlockAudioContext: vi.fn(),
       unlockDeviceCue: vi.fn(),
     });
@@ -72,6 +75,7 @@ describe('SpeechCoordinator', () => {
       rate: 1,
       kokoroVoiceId: 'af_heart',
       kokoroAllowed: true,
+      piperAllowed: true,
     });
     expect(phoneChoice).toBe('device');
     expect(device.calls).toEqual(['one half cup']);
@@ -82,17 +86,20 @@ describe('SpeechCoordinator', () => {
       rate: 1,
       kokoroVoiceId: 'af_heart',
       kokoroAllowed: true,
+      piperAllowed: true,
     });
     expect(laptopChoice).toBe('kokoro');
     expect(kokoro.calls).toEqual(['three quarters mile']);
   });
 
-  it('uses device voice first on laptops when Kokoro is marked too slow', () => {
+  it('uses Piper automatically on laptops when Kokoro is too slow or not ready', () => {
     const device = fakeProvider('device', true);
     const kokoro = fakeProvider('kokoro', true);
+    const piper = fakeProvider('piper', true);
     const coordinator = new SpeechCoordinator({
       deviceProvider: device,
       kokoroProvider: kokoro,
+      piperProvider: piper,
       unlockAudioContext: vi.fn(),
       unlockDeviceCue: vi.fn(),
     });
@@ -104,47 +111,110 @@ describe('SpeechCoordinator', () => {
       kokoroVoiceId: 'af_heart',
       kokoroAllowed: true,
       kokoroTooSlow: true,
+      piperAllowed: true,
+      piperTooSlow: false,
     });
-    expect(choice).toBe('device');
+    expect(choice).toBe('piper');
     expect(kokoro.calls).toHaveLength(0);
+    expect(piper.calls).toEqual(['Hello class']);
   });
 
-  it('falls back to device voice if Kokoro has not started playing within 4 seconds', () => {
+  it('jumps straight to device voice at 4 s if Kokoro times out while Piper is unready or busy (<5 s silence cap)', () => {
     vi.useFakeTimers();
     const stalledKokoro = fakeProvider('kokoro', true, { stallStart: true });
+    const unreadyPiper = fakeProvider('piper', false);
     const device = fakeProvider('device', true);
     const onProviderStarted = vi.fn();
 
-    const coordinator = new SpeechCoordinator({
+    const coordinator1 = new SpeechCoordinator({
       deviceProvider: device,
       kokoroProvider: stalledKokoro,
+      piperProvider: unreadyPiper,
       unlockAudioContext: vi.fn(),
       unlockDeviceCue: vi.fn(),
       firstAudioTimeoutMs: 4000,
     });
 
-    coordinator.speakJob('A clear description.', {
+    coordinator1.speakJob('A clear description.', {
       deviceClass: 'laptop',
       voiceOrder: 'auto',
       rate: 1,
       kokoroVoiceId: 'af_heart',
       kokoroAllowed: true,
+      piperAllowed: true,
       onProviderStarted,
     });
 
     expect(stalledKokoro.calls).toEqual(['A clear description.']);
     expect(device.calls).toHaveLength(0);
 
-    // At 3.9s still waiting on Kokoro
+    // At 3.999 s still waiting on Kokoro
     vi.advanceTimersByTime(3999);
     expect(device.calls).toHaveLength(0);
 
-    // At 4.0s Kokoro is cancelled and device voice takes over seamlessly
+    // At 4.000 s Kokoro is cancelled and device voice starts immediately
     vi.advanceTimersByTime(1);
     expect(stalledKokoro.stopSpies[0]).toHaveBeenCalledTimes(1);
+    expect(unreadyPiper.calls).toHaveLength(0);
     expect(device.calls).toEqual(['A clear description.']);
-    expect(coordinator.getStatus().activeProvider).toBe('device');
+    expect(coordinator1.getStatus().activeProvider).toBe('device');
     expect(onProviderStarted).toHaveBeenCalledWith('device');
+
+    // Also skips busy Piper directly to device voice when timeout hits
+    const busyPiper = fakeProvider('piper', true, { busy: true });
+    const device2 = fakeProvider('device', true);
+    const stalledKokoro2 = fakeProvider('kokoro', true, { stallStart: true });
+    const coordinator2 = new SpeechCoordinator({
+      deviceProvider: device2,
+      kokoroProvider: stalledKokoro2,
+      piperProvider: busyPiper,
+      unlockAudioContext: vi.fn(),
+      unlockDeviceCue: vi.fn(),
+      firstAudioTimeoutMs: 4000,
+    });
+
+    coordinator2.speakJob('Busy piper check.', {
+      deviceClass: 'laptop',
+      voiceOrder: 'auto',
+      rate: 1,
+      kokoroVoiceId: 'af_heart',
+      kokoroAllowed: true,
+      piperAllowed: true,
+    });
+    vi.advanceTimersByTime(4000);
+    expect(busyPiper.calls).toHaveLength(0);
+    expect(device2.calls).toEqual(['Busy piper check.']);
+  });
+
+  it('uses idle calibrated Piper after Kokoro 4s timeout without arming a second 4s watchdog', () => {
+    vi.useFakeTimers();
+    const stalledKokoro = fakeProvider('kokoro', true, { stallStart: true });
+    const idleStalledPiper = fakeProvider('piper', true, { stallStart: true, busy: false });
+    const device = fakeProvider('device', true);
+
+    const coordinator = new SpeechCoordinator({
+      deviceProvider: device,
+      kokoroProvider: stalledKokoro,
+      piperProvider: idleStalledPiper,
+      unlockAudioContext: vi.fn(),
+      unlockDeviceCue: vi.fn(),
+      firstAudioTimeoutMs: 4000,
+    });
+
+    coordinator.speakJob('Timeout handoff.', {
+      deviceClass: 'laptop',
+      voiceOrder: 'auto',
+      rate: 1,
+      kokoroVoiceId: 'af_heart',
+      kokoroAllowed: true,
+      piperAllowed: true,
+    });
+
+    vi.advanceTimersByTime(4000);
+    expect(idleStalledPiper.calls).toEqual(['Timeout handoff.']);
+    // No second 4-second watchdog timer is armed for Piper.
+    vi.advanceTimersByTime(8000);
+    expect(idleStalledPiper.stopSpies[0]).not.toHaveBeenCalled();
   });
 
   it('skips Kokoro immediately without blocking while downloading or when disallowed on phone', () => {

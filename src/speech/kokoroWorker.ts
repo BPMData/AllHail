@@ -1,10 +1,16 @@
+import { env } from '@huggingface/transformers';
 import { KokoroTTS } from 'kokoro-js';
 import {
   hasAudiblePcm,
-  loadKokoroWithFallback,
+  loadKokoroWebGpu,
   type KokoroBackend,
   type KokoroLoadProgress,
 } from './kokoroLoader.ts';
+
+// Point Transformers.js ONNX runtime WASM helpers at our self-hosted single-version binaries.
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = '/ort/';
+}
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX';
 
@@ -68,7 +74,7 @@ async function loadModel(): Promise<KokoroTTS> {
 
   ttsPromise = (async () => {
     try {
-      const loaded = await loadKokoroWithFallback<KokoroTTS>({
+      const loaded = await loadKokoroWebGpu<KokoroTTS>({
         hasWebGpuAdapter: detectWebGpuAdapter,
         loadModel: ({ dtype, device, progress_callback }) =>
           KokoroTTS.from_pretrained(MODEL_ID, {

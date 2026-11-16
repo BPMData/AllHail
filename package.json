@@ -13,11 +13,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "vite build",
+    "build": "vite build && npm run check:ort",
+    "check:ort": "node scripts/check-ort.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test:pwa": "playwright test"
   },
   "dependencies": {
+    "@diffusionstudio/piper-wasm": "^1.0.0",
+    "@mintplex-labs/piper-tts-web": "^1.0.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "kokoro-js": "^1.2.1",
@@ -40,5 +43,8 @@
     "vite": "^8.3.8",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4"
   }
 }

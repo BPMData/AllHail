@@ -7,6 +7,8 @@ import {
   type VoiceOrderPreference,
 } from '../settings.ts';
 import type { KokoroState } from '../speech/kokoroClient.ts';
+import type { PiperState } from '../speech/piperClient.ts';
+import type { VoiceProviderId } from '../speech/speechCoordinator.ts';
 
 type InfoSettingsViewProps = {
   deviceClass: DeviceClass;
@@ -15,14 +17,19 @@ type InfoSettingsViewProps = {
   deviceVoices: readonly SpeechSynthesisVoice[];
   deviceVoiceUnavailable: boolean;
   kokoroState: KokoroState;
+  piperState: PiperState;
+  activeVoiceId: VoiceProviderId;
   needRefresh: boolean;
   savedVisible: boolean;
   savedAnnouncement: string;
   voicePreviewMessage: string | null;
+  piperPreviewMessage: string | null;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   onSelectDeviceVoice: (voiceName: string | null) => void;
   onSelectKokoroVoice: (voiceId: string) => void;
+  onPreviewPiper: () => void;
   onRetryKokoro: () => void;
+  onRetryPiper: () => void;
   onUpdateApp: () => void;
 };
 
@@ -33,19 +40,34 @@ export function InfoSettingsView({
   deviceVoices,
   deviceVoiceUnavailable,
   kokoroState,
+  piperState,
+  activeVoiceId,
   needRefresh,
   savedVisible,
   savedAnnouncement,
   voicePreviewMessage,
+  piperPreviewMessage,
   onUpdateSettings,
   onSelectDeviceVoice,
   onSelectKokoroVoice,
+  onPreviewPiper,
   onRetryKokoro,
+  onRetryPiper,
   onUpdateApp,
 }: InfoSettingsViewProps) {
+  const activeVoiceName =
+    activeVoiceId === 'kokoro'
+      ? strings.activeVoiceKokoro
+      : activeVoiceId === 'piper'
+        ? strings.activeVoicePiper
+        : strings.activeVoiceDevice;
+
   const kokoroStatusMessage = (() => {
     if (deviceClass === 'phone' && !settings.kokoroEnabledOnPhone) {
       return strings.kokoroStatusOff;
+    }
+    if (kokoroState.status === 'skipped') {
+      return strings.kokoroStatusSkipped;
     }
     if (kokoroState.status === 'ready') {
       return kokoroState.tooSlow ? strings.kokoroTooSlow : strings.kokoroStatusReady;
@@ -56,6 +78,35 @@ export function InfoSettingsView({
     if (kokoroState.status === 'error') return strings.kokoroStatusError;
     if (!online) return strings.kokoroStatusWaitingOnline;
     return `${strings.kokoroStatusDownloading} (0%)`;
+  })();
+
+  const piperSizeText = String(piperState.sizeMb);
+  const piperHeading = strings.piperHeadingTemplate.replace('{size}', piperSizeText);
+  const piperPhonePrompt = strings.piperPhonePromptTemplate.replace('{size}', piperSizeText);
+  const piperLaptopHint = strings.piperLaptopHintTemplate.replace('{size}', piperSizeText);
+  const piperEnablePhoneLabel = strings.piperEnablePhoneLabelTemplate.replace('{size}', piperSizeText);
+
+  const piperStatusMessage = (() => {
+    if (piperState.status === 'unavailable') {
+      return strings.piperStatusUnavailable;
+    }
+    if (deviceClass === 'phone' && !settings.piperEnabledOnPhone) {
+      return strings.piperStatusOff;
+    }
+    if (piperState.status === 'ready') {
+      return piperState.tooSlow ? strings.piperTooSlow : strings.piperStatusReady;
+    }
+    if (piperState.status === 'downloading') {
+      return `${strings.piperStatusDownloading} (${piperState.progress}%)`;
+    }
+    if (piperState.status === 'error') return strings.piperStatusError;
+    if (!online) {
+      return strings.piperStatusWaitingOnlineTemplate.replace('{size}', piperSizeText);
+    }
+    if (deviceClass === 'laptop') {
+      return strings.piperStatusIdleLaptop;
+    }
+    return `${strings.piperStatusDownloading} (0%)`;
   })();
 
   return (
@@ -76,6 +127,10 @@ export function InfoSettingsView({
             </span>
           )}
         </div>
+
+        <p className="mt-3 text-lg font-bold" data-testid="active-voice-status">
+          {strings.activeVoicePrefix}: {activeVoiceName}
+        </p>
 
         {/* Quiet polite live announcement for screen readers when a setting saves */}
         <span
@@ -141,8 +196,9 @@ export function InfoSettingsView({
             className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
           >
             <option value="auto">{strings.voiceOrderAuto}</option>
-            <option value="device-first">{strings.voiceOrderDeviceFirst}</option>
             <option value="kokoro-first">{strings.voiceOrderKokoroFirst}</option>
+            <option value="piper-first">{strings.voiceOrderPiperFirst}</option>
+            <option value="device-first">{strings.voiceOrderDeviceFirst}</option>
           </select>
         </div>
 
@@ -177,8 +233,8 @@ export function InfoSettingsView({
           )}
         </div>
 
-        {/* Kokoro browser voice (~90 MB) */}
-        <div className="mt-5 space-y-4">
+        {/* Kokoro WebGPU browser voice */}
+        <div className="mt-5 space-y-4 border-b pb-5">
           <h2 className="text-xl font-bold">{strings.kokoroHeading}</h2>
           <p className="text-base opacity-90">
             {deviceClass === 'phone' ? strings.kokoroPhonePrompt : strings.kokoroLaptopHint}
@@ -245,9 +301,71 @@ export function InfoSettingsView({
             )}
           </div>
         </div>
+
+        {/* Piper CPU browser voice */}
+        <div className="mt-5 space-y-4">
+          <h2 className="text-xl font-bold">{piperHeading}</h2>
+          <p className="text-base opacity-90">
+            {deviceClass === 'phone' ? piperPhonePrompt : piperLaptopHint}
+          </p>
+
+          {deviceClass === 'phone' && piperState.status !== 'unavailable' && (
+            <label className="flex min-h-[48px] cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={settings.piperEnabledOnPhone}
+                onChange={(e) => onUpdateSettings({ piperEnabledOnPhone: e.target.checked })}
+                className="mt-1 h-6 w-6 shrink-0 accent-[#153f35]"
+              />
+              <span className="text-lg font-bold">{piperEnablePhoneLabel}</span>
+            </label>
+          )}
+
+          <p className="text-base font-bold" data-testid="piper-status">
+            {piperStatusMessage}
+          </p>
+
+          {piperState.status === 'downloading' && (
+            <div className="flex flex-wrap items-center gap-3">
+              <progress
+                max={100}
+                value={piperState.progress}
+                aria-label={strings.piperProgressLabel}
+                className="kokoro-progress min-w-[160px] flex-1"
+              />
+              <span className="text-base font-bold tabular-nums">{piperState.progress}%</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {piperState.status === 'error' && (
+              <button
+                type="button"
+                onClick={onRetryPiper}
+                className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+              >
+                {strings.kokoroRetryButton}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onPreviewPiper}
+              className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+            >
+              {strings.piperPreviewButton}
+            </button>
+          </div>
+
+          {piperPreviewMessage && (
+            <p className="text-sm font-semibold" data-testid="piper-preview-note">
+              {piperPreviewMessage}
+            </p>
+          )}
+        </div>
       </section>
 
-      {/* Preserved PWA update, install instructions, and privacy note */}
+      {/* Install, Privacy, and About / Attribution section */}
       <section aria-label={strings.installTitle} className="space-y-4">
         {needRefresh && (
           <button
@@ -270,6 +388,25 @@ export function InfoSettingsView({
           <summary className="cursor-pointer py-3 font-bold">{strings.privacyTitle}</summary>
           <p className="mt-3">{strings.privacy}</p>
         </details>
+
+        <section aria-labelledby="about-credits-heading" className="border-t pt-4">
+          <h2 id="about-credits-heading" className="text-lg font-bold">
+            {strings.aboutHeading}
+          </h2>
+          <p className="mt-2 text-base" data-testid="piper-attribution">
+            {strings.piperAttribution}
+          </p>
+          <p className="mt-2 text-base">
+            {strings.creditsIntro}{' '}
+            <a
+              href="/CREDITS.md"
+              className="font-bold underline"
+            >
+              {strings.creditsLinkLabel}
+            </a>
+            .
+          </p>
+        </section>
       </section>
     </div>
   );

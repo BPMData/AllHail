@@ -6,7 +6,12 @@ export default defineConfig({
   plugins: [react(), VitePWA({ manifest: false, injectRegister: false })],
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}', 'server/**/*.test.ts', 'shared/**/*.test.ts'],
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      'server/**/*.test.ts',
+      'shared/**/*.test.ts',
+      'tests/*.test.ts',
+    ],
     restoreMocks: true,
   },
 });

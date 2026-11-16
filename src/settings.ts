@@ -1,5 +1,5 @@
 export type DeviceClass = 'phone' | 'laptop';
-export type VoiceOrderPreference = 'auto' | 'device-first' | 'kokoro-first';
+export type VoiceOrderPreference = 'auto' | 'device-first' | 'kokoro-first' | 'piper-first';
 
 export type AppSettings = {
   autoRead: boolean;
@@ -7,6 +7,7 @@ export type AppSettings = {
   voiceOrder: VoiceOrderPreference;
   deviceVoiceName: string | null;
   kokoroEnabledOnPhone: boolean;
+  piperEnabledOnPhone: boolean;
   kokoroVoiceId: string;
 };
 
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   voiceOrder: 'auto',
   deviceVoiceName: null,
   kokoroEnabledOnPhone: false,
+  piperEnabledOnPhone: false,
   kokoroVoiceId: 'af_heart',
 };
 
@@ -77,7 +79,10 @@ export function loadSettings(): AppSettings {
       ? parsed.speechRate
       : DEFAULT_SETTINGS.speechRate;
     const voiceOrder: VoiceOrderPreference =
-      parsed.voiceOrder === 'device-first' || parsed.voiceOrder === 'kokoro-first' || parsed.voiceOrder === 'auto'
+      parsed.voiceOrder === 'device-first' ||
+      parsed.voiceOrder === 'kokoro-first' ||
+      parsed.voiceOrder === 'piper-first' ||
+      parsed.voiceOrder === 'auto'
         ? parsed.voiceOrder
         : DEFAULT_SETTINGS.voiceOrder;
     const kokoroVoiceId = KOKORO_VOICES.some((v) => v.id === parsed.kokoroVoiceId)
@@ -98,6 +103,10 @@ export function loadSettings(): AppSettings {
         typeof parsed.kokoroEnabledOnPhone === 'boolean'
           ? parsed.kokoroEnabledOnPhone
           : DEFAULT_SETTINGS.kokoroEnabledOnPhone,
+      piperEnabledOnPhone:
+        typeof parsed.piperEnabledOnPhone === 'boolean'
+          ? parsed.piperEnabledOnPhone
+          : DEFAULT_SETTINGS.piperEnabledOnPhone,
       kokoroVoiceId,
     };
   } catch {

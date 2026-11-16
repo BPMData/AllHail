@@ -22,11 +22,15 @@ import {
   type AppSettings,
   type DeviceClass,
 } from './settings.ts';
+import { SharedAudioContextManager } from './speech/chunkAudioPlayer.ts';
 import { KokoroBrowserClient, type KokoroState } from './speech/kokoroClient.ts';
+import { coordinateOfflineVoiceStartup, probeWebGpuAdapter } from './speech/offlineVoiceController.ts';
+import { PiperBrowserClient, type PiperState } from './speech/piperClient.ts';
 import {
   createBrowserDeviceVoiceProvider,
   getBrowserDeviceVoices,
   getDeviceVoiceShortName,
+  resolveActiveVoiceId,
   resolveDeviceVoice,
   SpeechCoordinator,
   subscribeBrowserDeviceVoices,
@@ -39,17 +43,22 @@ export type ActiveTab = 'camera' | 'history' | 'info';
 export type AppProps = {
   coordinator?: SpeechCoordinator;
   kokoroClient?: KokoroBrowserClient;
+  piperClient?: PiperBrowserClient;
   deviceClassOverride?: DeviceClass;
   deviceVoicesOverride?: readonly SpeechSynthesisVoice[];
+  hasWebGpuAdapterOverride?: () => Promise<boolean>;
 };
 
 function createDefaultRuntime() {
-  const kokoro = new KokoroBrowserClient();
+  const audioManager = new SharedAudioContextManager();
+  const kokoro = new KokoroBrowserClient({ audioManager });
+  const piper = new PiperBrowserClient({ audioManager });
   const coordinator = new SpeechCoordinator({
     deviceProvider: createBrowserDeviceVoiceProvider(),
     kokoroProvider: {
       id: 'kokoro',
       isReady: () => kokoro.isReady(),
+      isBusy: () => kokoro.isBusy(),
       speak: (cleanedText, callbacks) =>
         kokoro.speak(cleanedText, {
           rate: callbacks.rate,
@@ -59,28 +68,47 @@ function createDefaultRuntime() {
           onError: callbacks.onError,
         }),
     },
-    unlockAudioContext: () => kokoro.unlockAudioContext(),
-    playClickSound: () => kokoro.playSettingsClick(),
+    piperProvider: {
+      id: 'piper',
+      isReady: () => piper.isReady(),
+      isBusy: () => piper.isBusy(),
+      speak: (cleanedText, callbacks) =>
+        piper.speak(cleanedText, {
+          rate: callbacks.rate,
+          onStart: () => callbacks.onStart?.('piper'),
+          onEnd: callbacks.onEnd,
+          onError: callbacks.onError,
+        }),
+    },
+    unlockAudioContext: () => audioManager.unlock(),
+    playClickSound: () => audioManager.playSettingsClick(),
   });
-  return { kokoro, coordinator };
+  return { kokoro, piper, coordinator };
 }
 
 export function App({
   coordinator: injectedCoordinator,
   kokoroClient: injectedKokoro,
+  piperClient: injectedPiper,
   deviceClassOverride,
   deviceVoicesOverride,
+  hasWebGpuAdapterOverride,
 }: AppProps = {}) {
   const runtime = useMemo(() => {
-    if (injectedCoordinator && injectedKokoro) {
-      return { coordinator: injectedCoordinator, kokoro: injectedKokoro };
+    if (injectedCoordinator && injectedKokoro && injectedPiper) {
+      return {
+        coordinator: injectedCoordinator,
+        kokoro: injectedKokoro,
+        piper: injectedPiper,
+      };
     }
     const created = createDefaultRuntime();
     return {
       coordinator: injectedCoordinator ?? created.coordinator,
       kokoro: injectedKokoro ?? created.kokoro,
+      piper: injectedPiper ?? created.piper,
     };
-  }, [injectedCoordinator, injectedKokoro]);
+  }, [injectedCoordinator, injectedKokoro, injectedPiper]);
 
   const deviceClass = useMemo(
     () => deviceClassOverride ?? detectDeviceClass(),
@@ -95,6 +123,7 @@ export function App({
     () => deviceVoicesOverride ?? getBrowserDeviceVoices(),
   );
   const [kokoroState, setKokoroState] = useState<KokoroState>(() => runtime.kokoro.getState());
+  const [piperState, setPiperState] = useState<PiperState>(() => runtime.piper.getState());
   const [speechStatus, setSpeechStatus] = useState<SpeechStatusSnapshot>(() => runtime.coordinator.getStatus());
   const [lastVoiceUsed, setLastVoiceUsed] = useState<VoiceProviderId | null>(null);
   const [busy, setBusy] = useState(false);
@@ -105,12 +134,14 @@ export function App({
   const [savedVisible, setSavedVisible] = useState(false);
   const [savedAnnouncement, setSavedAnnouncement] = useState('');
   const [voicePreviewMessage, setVoicePreviewMessage] = useState<string | null>(null);
+  const [piperPreviewMessage, setPiperPreviewMessage] = useState<string | null>(null);
 
   const userRequestedUpdate = useRef(false);
   const reloading = useRef(false);
   const savedHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedSeqRef = useRef(0);
   const kokoroAnnounceStageRef = useRef<'none' | 'start' | 'half' | 'done'>('none');
+  const piperAnnounceStageRef = useRef<'none' | 'start' | 'half' | 'done'>('none');
 
   const reloadOnce = () => {
     if (!reloading.current) {
@@ -154,7 +185,6 @@ export function App({
     const unsubKokoro = runtime.kokoro.subscribe((next) => {
       setKokoroState(next);
 
-      // Throttled screen-reader announcements: ONLY start, 50%, and done/error.
       if (next.status === 'downloading') {
         if (kokoroAnnounceStageRef.current === 'none' || kokoroAnnounceStageRef.current === 'done') {
           kokoroAnnounceStageRef.current = 'start';
@@ -173,16 +203,44 @@ export function App({
           kokoroAnnounceStageRef.current = 'done';
           setStatusMessage(strings.kokoroStatusError);
         }
-      } else if (next.status === 'idle') {
+      } else if (next.status === 'idle' || next.status === 'skipped') {
         kokoroAnnounceStageRef.current = 'none';
       }
     });
+
+    const unsubPiper = runtime.piper.subscribe((next) => {
+      setPiperState(next);
+
+      if (next.status === 'downloading') {
+        if (piperAnnounceStageRef.current === 'none' || piperAnnounceStageRef.current === 'done') {
+          piperAnnounceStageRef.current = 'start';
+          setStatusMessage(strings.piperAnnounceStart);
+        } else if (next.progress >= 50 && piperAnnounceStageRef.current === 'start') {
+          piperAnnounceStageRef.current = 'half';
+          setStatusMessage(strings.piperAnnounceHalf);
+        }
+      } else if (next.status === 'ready') {
+        if (piperAnnounceStageRef.current === 'start' || piperAnnounceStageRef.current === 'half') {
+          piperAnnounceStageRef.current = 'done';
+          setStatusMessage(strings.piperAnnounceReady);
+        }
+      } else if (next.status === 'error') {
+        if (piperAnnounceStageRef.current !== 'done') {
+          piperAnnounceStageRef.current = 'done';
+          setStatusMessage(strings.piperStatusError);
+        }
+      } else if (next.status === 'idle' || next.status === 'unavailable') {
+        piperAnnounceStageRef.current = 'none';
+      }
+    });
+
     const unsubSpeech = runtime.coordinator.subscribe((snapshot) => {
       setSpeechStatus(snapshot);
     });
     void listHistoryEntries().then(setHistory);
     return () => {
       unsubKokoro();
+      unsubPiper();
       unsubSpeech();
       runtime.coordinator.stop();
       if (savedHideTimerRef.current !== null) {
@@ -191,15 +249,28 @@ export function App({
     };
   }, [runtime]);
 
-  // Download Kokoro automatically ONLY on laptops (or on phones when user explicitly opted in).
+  // Decide Kokoro vs Piper before downloading anything on laptops; keep phones opt-in.
   useEffect(() => {
-    const allowedToDownload =
-      online &&
-      (deviceClass === 'laptop' || (deviceClass === 'phone' && settings.kokoroEnabledOnPhone));
-    if (allowedToDownload && runtime.kokoro.getState().status === 'idle') {
-      runtime.kokoro.startDownload();
-    }
-  }, [online, deviceClass, settings.kokoroEnabledOnPhone, runtime.kokoro]);
+    void coordinateOfflineVoiceStartup({
+      online,
+      deviceClass,
+      kokoroEnabledOnPhone: settings.kokoroEnabledOnPhone,
+      piperEnabledOnPhone: settings.piperEnabledOnPhone,
+      hasWebGpuAdapter: hasWebGpuAdapterOverride ?? probeWebGpuAdapter,
+      kokoro: runtime.kokoro,
+      piper: runtime.piper,
+    });
+  }, [
+    online,
+    deviceClass,
+    settings.kokoroEnabledOnPhone,
+    settings.piperEnabledOnPhone,
+    kokoroState.status,
+    kokoroState.tooSlow,
+    hasWebGpuAdapterOverride,
+    runtime.kokoro,
+    runtime.piper,
+  ]);
 
   const handleUpdate = async () => {
     userRequestedUpdate.current = true;
@@ -231,7 +302,6 @@ export function App({
     runtime.coordinator.playSettingsClick();
     setSavedVisible(true);
     savedSeqRef.current += 1;
-    // Toggle briefly when repeated so screen readers still catch consecutive saves quietly.
     const seq = savedSeqRef.current;
     setSavedAnnouncement('');
     queueMicrotask(() => {
@@ -266,8 +336,34 @@ export function App({
     [deviceVoices, settings.deviceVoiceName, online],
   );
 
+  const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
+  const piperAllowed = deviceClass === 'laptop' || settings.piperEnabledOnPhone;
+
+  const activeVoiceId = useMemo(
+    () =>
+      resolveActiveVoiceId({
+        deviceClass,
+        voiceOrder: settings.voiceOrder,
+        kokoroReady: kokoroState.status === 'ready',
+        kokoroAllowed,
+        kokoroTooSlow: kokoroState.tooSlow,
+        piperReady: piperState.status === 'ready',
+        piperAllowed,
+        piperTooSlow: piperState.tooSlow,
+      }),
+    [
+      deviceClass,
+      settings.voiceOrder,
+      kokoroState.status,
+      kokoroState.tooSlow,
+      kokoroAllowed,
+      piperState.status,
+      piperState.tooSlow,
+      piperAllowed,
+    ],
+  );
+
   const speakText = (text: string, rateOverride?: number, voiceOverride?: string) => {
-    const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
     const initial = runtime.coordinator.speakJob(text, {
       deviceClass,
       voiceOrder: settings.voiceOrder,
@@ -277,6 +373,8 @@ export function App({
       online,
       kokoroAllowed,
       kokoroTooSlow: kokoroState.tooSlow,
+      piperAllowed,
+      piperTooSlow: piperState.tooSlow,
       onProviderStarted: (provider) => {
         setLastVoiceUsed(provider);
       },
@@ -319,7 +417,6 @@ export function App({
 
   const handleSelectKokoroVoice = (voiceId: string) => {
     const voiceMeta = KOKORO_VOICES.find((v) => v.id === voiceId) ?? KOKORO_VOICES[0];
-    const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
     const kokoroReady = kokoroAllowed && runtime.kokoro.isReady();
 
     if (!kokoroReady) {
@@ -342,6 +439,32 @@ export function App({
       kokoroAllowed: true,
       kokoroTooSlow: false,
       forceProvider: 'kokoro',
+    });
+  };
+
+  const handlePreviewPiper = () => {
+    if (piperState.status === 'unavailable') {
+      setPiperPreviewMessage(strings.piperPreviewUnavailable);
+      triggerSavedFeedback(strings.piperPreviewUnavailable);
+      return;
+    }
+    const piperReady = piperAllowed && runtime.piper.isReady();
+    if (!piperReady) {
+      setPiperPreviewMessage(strings.piperPreviewNotReady);
+      triggerSavedFeedback(strings.piperPreviewNotReady);
+      return;
+    }
+
+    setPiperPreviewMessage(null);
+    runtime.coordinator.unlockAudioOnly();
+    runtime.coordinator.speakJob(strings.piperPreviewText, {
+      deviceClass,
+      voiceOrder: 'piper-first',
+      rate: settings.speechRate,
+      kokoroVoiceId: settings.kokoroVoiceId,
+      piperAllowed: true,
+      piperTooSlow: false,
+      forceProvider: 'piper',
     });
   };
 
@@ -489,11 +612,13 @@ export function App({
         </header>
 
         <main id="main" tabIndex={-1}>
-          {/* Visible Kokoro download banner directly under header on Camera screen */}
+          {/* Visible voice download banner directly under header on Camera screen */}
           {activeTab === 'camera' && (
             <KokoroBanner
               kokoroState={kokoroState}
+              piperState={piperState}
               onRetry={() => runtime.kokoro.retryDownload()}
+              onRetryPiper={() => runtime.piper.retryDownload()}
             />
           )}
 
@@ -568,14 +693,19 @@ export function App({
               deviceVoices={deviceVoices}
               deviceVoiceUnavailable={Boolean(settings.deviceVoiceName && deviceVoiceResolution.preferredMissing)}
               kokoroState={kokoroState}
+              piperState={piperState}
+              activeVoiceId={activeVoiceId}
               needRefresh={needRefresh}
               savedVisible={savedVisible}
               savedAnnouncement={savedAnnouncement}
               voicePreviewMessage={voicePreviewMessage}
+              piperPreviewMessage={piperPreviewMessage}
               onUpdateSettings={updateSettings}
               onSelectDeviceVoice={handleSelectDeviceVoice}
               onSelectKokoroVoice={handleSelectKokoroVoice}
+              onPreviewPiper={handlePreviewPiper}
               onRetryKokoro={() => runtime.kokoro.retryDownload()}
+              onRetryPiper={() => runtime.piper.retryDownload()}
               onUpdateApp={() => void handleUpdate()}
             />
           )}
