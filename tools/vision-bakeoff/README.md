@@ -19,7 +19,7 @@ Every photo is turned upright, shrunk and stripped of all metadata (GPS included
 From the repo root (Node 22.18 or later runs `.ts` files directly):
 
 ```bash
-OPENROUTER_API_KEY="$(cat ../openrouter.txt)" node tools/vision-bakeoff/bakeoff.ts --photos sample_images
+OPENROUTER_API_KEY="$(cat ../Secrets/openrouter.txt)" node tools/vision-bakeoff/bakeoff.ts --photos sample_images
 ```
 
 Open the `report.html` it prints. Score each answer 1–5. **Hide model names** shuffles the answers so you score them blind. Scores save in the browser, and **Export scores** downloads them.
@@ -37,7 +37,7 @@ A blank answer is retried once, and the run records that it happened.
 ## Judge it
 
 ```bash
-OPENROUTER_API_KEY="$(cat ../openrouter.txt)" node tools/vision-bakeoff/judge.ts tools/vision-bakeoff/results/<time> --photos sample_images
+OPENROUTER_API_KEY="$(cat ../Secrets/openrouter.txt)" node tools/vision-bakeoff/judge.ts tools/vision-bakeoff/results/<time> --photos sample_images
 ```
 
 For each photo and mode, every judge sees the image and all the answers, shuffled and labelled A, B, C… with no model names. Each answer is scored 1–10 on **accuracy** (nothing invented), **insight** (mood, what matters, intent), **listening** (natural spoken prose, no stock phrases) and **completeness**, and the judge lists any invented details.

@@ -1,0 +1,27 @@
+# Files left out of the Cloud Run source upload (Google Cloud Buildpacks builds from the rest).
+# Keep stubs/ and scripts/: package.json "overrides" points at file:./stubs/empty-package,
+# and `npm run build` runs scripts/check-ort.mjs.
+.git/
+.github/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+.env*
+!.env.example
+bun.lock
+package-lock.json
+
+# Generated during the build from node_modules
+public/ort/
+public/piper/
+public/CREDITS.md
+
+# Personal photos, bake-off results and research notes never leave this computer
+sample_images/
+tools/vision-bakeoff/photos/
+tools/vision-bakeoff/results/
+research_outputs/
