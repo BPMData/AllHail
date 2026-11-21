@@ -2,7 +2,7 @@
 
 **AllHail** is an installable web app (PWA) that turns photos, documents and typed text into speech for blind and low-vision students and their teachers. It joins OverBoard, AllAboard and OverHeard. It started as [`BPMData/tts_st`](https://github.com/BPMData/tts_st), a Streamlit app; that repo is archived, its history and earlier pull requests stay there, and the last Streamlit version is its `streamlit-final` tag.
 
-**This repo is edited by Google AI Studio, Codex and Claude.** AI Studio doesn't keep `package-lock.json` here, so CI installs with `npm install`, not `npm ci`. Don't re-add the lock file or switch CI back.
+**This repo is edited by Codex and Claude.** It used to be built in Google AI Studio, but it has moved off AI Studio completely: GitHub Actions deploys it to Cloud Run, and `https://bpmdata.github.io/allhail` redirects to the Cloud Run address. `package-lock.json` is committed, and CI and the deploy install with `npm ci`, so every build uses the same versions. After changing dependencies, run `npm install` and commit the updated lock file in the same pull request.
 
 **Read [`PLAN.md`](PLAN.md) first.** It holds every decision made so far: who the app is for, the speech fallback chain, the vision model chains for each button, the prompt tests and the build order. The **step 2** foundation is in place; start new feature work with **step 3** (Student mode). See [`README.md`](README.md) for local setup and checks. Real-device installation checks from step 2 still need a human.
 

@@ -13,7 +13,6 @@ test-results/
 .env*
 !.env.example
 bun.lock
-package-lock.json
 
 # Generated during the build from node_modules
 public/ort/

@@ -2,7 +2,7 @@ const PLATFORM_SW_PATTERN = /(?:^|\/)_service-worker\.js(?:$|[?#])/;
 const guardedContainers = new WeakSet<object>();
 
 /**
- * Prevents hosting-proxy scripts (such as AI Studio's injected ./_service-worker.js)
+ * Prevents hosting-proxy scripts (such as the ./_service-worker.js that AI Studio's preview injected)
  * from registering a competing service worker on AllHail's root scope and causing
  * update prompts and reload loops.
  */

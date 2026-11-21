@@ -1,8 +1,24 @@
 # AllHail
 
-AllHail is an installable web app for blind and low-vision students and their teachers. It will turn photos, documents and typed text into speech, alongside OverBoard, AllAboard and OverHeard.
+AllHail is an installable web app for blind and low-vision students and their teachers. It turns photos into speech, alongside OverBoard, AllAboard and OverHeard. Documents and typed text come next (see [PLAN.md](PLAN.md)).
 
-This branch completes **step 2 of [the rebuild plan](PLAN.md)**: the project foundation. It has an accessible home screen, install instructions, connection announcements and an offline app shell. Camera capture, AI descriptions, document reading and speech come in later steps.
+**Open it:** [bpmdata.github.io/allhail](https://bpmdata.github.io/allhail). That short link sends you to the app's Cloud Run address.
+
+- **Camera capture.** The **Quick look** and **Full detail** buttons open the camera, or take a frame from an optional live viewfinder. You can also choose a photo you already have. The phone vibrates when the photo is taken and again when the description is ready.
+- **Two description modes:**
+  - **Quick look:** a short overview (60–150 words) to get your bearings.
+  - **Full detail:** everything a sighted classmate could study. It reads all the text, handwriting, circled answers and grades, then describes the whole image area by area.
+- **Speech that starts by itself**, using an ordered fallback list of voices that run on the device:
+  - the device voice (`speechSynthesis`)
+  - Kokoro, which runs in the browser. It needs WebGPU and is a one-time download of about 330 MB.
+  - Piper, which runs in the browser and is a smaller one-time download.
+
+  Phones start with the device voice, and laptops with Kokoro, then Piper. Settings can change the order. If a voice fails or stays silent for 4 seconds, the next one takes over before speaking starts. A job never changes voice halfway through. The Google Cloud and Lemonfox cloud voices are planned but not built yet.
+- **Reading controls.** Tap the description to pause or resume. There are also Repeat, Stop and speed buttons. You can edit or copy the text, and download an MP3 made with Kokoro or Piper; device voices can't be saved as files.
+- **Works offline.** The app shell, the history and the Kokoro, Piper and device voices all work without the internet. With no connection, the app says plainly that new photos can't be described right now.
+- **History** of the last 50 descriptions, saved on the device in IndexedDB. Each can be replayed, opened, downloaded as an MP3 or deleted.
+- **Screen-reader ready.** Every control has a label, and status changes are announced ("Describing photo", "Description ready"). It is built for VoiceOver and TalkBack; checks on real devices still need a human.
+- **Private.** There are no accounts, and nothing leaves the device except the description request. Before upload, each photo is turned upright, shrunk to at most 1,568 px and redrawn so no GPS or camera details are sent. If that step fails, the photo isn't sent.
 
 ## Run it locally
 
@@ -14,7 +30,9 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:3000`. No API keys are needed for this step. The development server updates the browser when you edit files. Its service worker is disabled so old cached files do not hide your edits.
+`npm ci` installs the exact versions in `package-lock.json`. Use `npm install` only when you add or update a dependency, and commit the updated lock file with it.
+
+Open `http://localhost:3000`. To describe photos, put an OpenRouter key in `.env` as `OPENROUTER_API_KEY`. Without one, `POST /api/describe` replies "Photo descriptions are not configured on the server yet.", and everything else still works. The development server updates the browser when you edit files. Its service worker is disabled so old cached files don't hide your edits.
 
 To try the installable, offline version, build it and start the production server:
 
@@ -25,51 +43,75 @@ NODE_ENV=production npm start
 
 The server serves the built app when `NODE_ENV=production`, or when it runs on Cloud Run (which sets `K_SERVICE`), even if `NODE_ENV` is missing. `NODE_ENV=development` always means the development server.
 
-### Deploying with Google AI Studio
+`PORT` defaults to `3000`, and `HOST` to `0.0.0.0`. Production runs `node server.ts` directly, with no TypeScript loader. `GET /api/health` checks that the server is up. `/api/describe` allows 20 requests per minute from each address. Deployment must use HTTPS for installation and offline support; localhost is fine for development. A phone visiting a laptop's plain HTTP network address can't use its service worker.
 
-- AI Studio's Publish builds the app, starts it with `node server.ts` on Cloud Run, and can rewrite the service's settings. Anything that must survive a publish belongs in code, not in console settings. That's why production is detected from `K_SERVICE` as well as `NODE_ENV`.
-- Keep `PORT=3000`; don't "fix" it to 8080 (see AllAboard's deployment notes).
-- `metadata.json` names the app and asks for the camera, so AI Studio's preview allows it.
-- Keys go in AI Studio's **Secrets** panel, never in the code: `OPENROUTER_API_KEY` from step 3 onwards. AI Studio adds `GEMINI_API_KEY` by itself; AllHail doesn't use it.
-- Test the camera and installing in the published URL in a full Chrome tab, not in AI Studio's preview pane.
+### Deploying
 
-`PORT` defaults to `3000`; `HOST` defaults to `0.0.0.0`. Production runs `node server.ts` directly, without a TypeScript loader. `GET /api/health` checks that the server is up. Deployment must serve over HTTPS for installation and offline support; localhost is allowed for development. A phone visiting a laptop's plain HTTP network address cannot use its service worker.
+Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). It runs the checks below, then deploys the `allhail` Cloud Run service with `gcloud run deploy --source .` on port 3000.
+
+- The workflow logs in with the `GCP_SA_KEY` repository secret.
+- `OPENROUTER_API_KEY` is set on the Cloud Run service itself. The deploy leaves service variables alone, so it doesn't need setting again.
+- The deploy keeps `--max-instances 1`. The rate limit is kept in memory, so more instances would multiply how much of the key one person can use.
+- `https://bpmdata.github.io/allhail` is a short link that redirects to the service's Cloud Run URL. The redirect isn't in this repo. Because the browser ends up on the Cloud Run address, the installed app, its offline files and its history all belong to that address, not to github.io.
+
+The app used to be built and published in Google AI Studio, but it has moved off AI Studio completely. The deploy still passes `--command ""` and `--args ""` to clear an entrypoint setting AI Studio left on the service.
 
 ## Check changes
 
 ```bash
 npm run typecheck
-npm test
 npm run build
+npm test
 node -e "import('./server.ts').then(() => console.log('OK'))"
 npm run smoke
 npx playwright install chromium
 npm run test:pwa
 ```
 
-GitHub Actions runs these checks with Node 24. Unit tests mock the service worker. The smoke test starts the production Express app on a temporary port and checks routes, cache headers, the manifest, icon sizes and the service worker. Playwright checks Chrome install eligibility and offline reopening on desktop and an emulated Android phone. It also checks that API replies are never cached. These checks do not call AI or speech services or use real photos. Test output stays ignored.
+GitHub Actions runs these checks with Node 24, in this order, on every pull request.
+
+- `npm run build` also runs `check:ort`, which makes sure exactly one ONNX runtime ships and reports Piper's download size.
+- Unit tests mock the service worker, OpenRouter and the voices.
+- The smoke test starts the production Express app on a temporary port. It checks the routes, cache headers, the manifest, icon sizes and the service worker.
+- Playwright checks Chrome install eligibility and reopening offline, on desktop and on an emulated Android phone. It also checks that API replies are never cached.
+
+None of these checks call real AI or speech services or use real photos. Test output stays out of git.
 
 ## Install and check offline on a real device
 
-1. Open the production app over HTTPS in Chrome on a laptop or Android phone. Wait for **App saved for offline use**.
+1. Open [bpmdata.github.io/allhail](https://bpmdata.github.io/allhail) in Chrome on a laptop or Android phone, and let it redirect to the Cloud Run address. Wait for **App saved for offline use**.
 2. On a laptop, choose Chrome's install icon in the address bar. On Android, use **Install app** or **Add to Home screen** from Chrome's menu.
-3. Close AllHail, disconnect from the internet, and open it again from its installed icon. Check that the home screen and install instructions open, with an offline announcement.
-4. Reconnect and check that the connection announcement changes. Try keyboard navigation and large text, plus VoiceOver or TalkBack.
+3. Describe a photo or two so the History has something in it. If you want an offline voice, let Kokoro or Piper finish downloading.
+4. Close AllHail, disconnect from the internet, and open it again from its installed icon. Check:
+   - the Camera, History and Settings & Info tabs open
+   - an offline announcement is made
+   - saved descriptions still play
+5. Reconnect and check that the connection announcement changes. Try keyboard navigation and large text, plus VoiceOver or TalkBack.
 
-On iPhone or iPad, use Safari's Share menu and **Add to Home Screen**. Physical device installation and screen-reader checks still need a human; browser emulation does not replace them.
+On iPhone or iPad, use Safari's Share menu and **Add to Home Screen**. Installing on physical devices and checking with screen readers still need a human; browser emulation doesn't replace them.
 
-The generated worker caches only the built app files, including local icons and styles. API routes are excluded from offline navigation, and there is no runtime cache for photos, text or API results. New versions offer an **Update AllHail** button so a reload will not interrupt future work.
+The service worker precaches the built app files, including local icons and styles. Piper's runtime files (`/ort/`, `/piper/`) are cached the first time they're used. Kokoro's model is stored by the browser when it downloads. API routes are excluded from offline navigation, and photos and API results are never cached. New versions offer an **Update AllHail** button, so a reload doesn't interrupt your work.
 
 ## Where things live
 
 - `src/`: React app and styles (React 19, Tailwind 4).
+- `src/components/CaptureView.tsx`: student camera mode.
+- `src/components/HistoryView.tsx`: description history.
+- `src/components/InfoSettingsView.tsx`: settings (voice order, Kokoro and Piper downloads), install help, privacy and credits.
+- `src/imagePrep.ts`: turning each photo upright, shrinking it and stripping its metadata before upload.
+- `src/historyStore.ts`: IndexedDB history.
+- `src/speech/`: the on-device speech pipeline: Kokoro, Piper, device voices, the coordinator that picks a voice, and MP3 export.
+- `server/describe.ts`: photo description endpoint with model fallback chains.
+- `server/visionConfig.ts`: the model chains for each button, timeouts and rate limits.
+- `shared/prompts.ts`: the v5 description prompts.
+- `shared/speechCleaner.ts`: tidies text for the voice (fractions to words, no markdown).
 - `shared/strings.ts`: all visible text, including HTML and manifest wording.
 - `server.ts`: Express server and development Vite middleware.
 - `vite.config.ts`: build, install manifest and offline cache rules.
 - `public/icons/`: original SVG and install icons. Regenerate the PNGs with `node scripts/generate-icons.mjs` after installing Playwright's Chromium.
 - `tools/vision-bakeoff/`: the preserved, human-run model and prompt tests. They are separate from app checks; see their [README](tools/vision-bakeoff/README.md).
 
-Read [AGENTS.md](AGENTS.md) and [PLAN.md](PLAN.md) before changing the app. Keep API keys on the server; never use a `VITE_` variable for a secret. Personal photos, `.env` files and bake-off results stay ignored. Image preparation, tested v5 prompts and provider chains will be wired in when their features are built.
+Read [AGENTS.md](AGENTS.md) and [PLAN.md](PLAN.md) before changing the app. Keep API keys on the server; never use a `VITE_` variable for a secret. Personal photos, `.env` files and bake-off results stay out of git.
 
 ## Recover the Streamlit version
 

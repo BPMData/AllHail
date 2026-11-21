@@ -24,9 +24,9 @@ jobs:
         with:
           node-version: 24
 
-      # No package-lock.json in this repo (AI Studio doesn't keep one), so install from package.json.
+      # Install the exact versions in package-lock.json.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
@@ -49,8 +49,9 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       # Call gcloud directly: deploy-cloudrun's flag parser turns `--command=` into a bare
-      # `--command`, which gcloud rejects. --command "" / --args "" reset AI Studio's leftover
-      # entrypoint override so the Buildpacks launcher runs `npm start` (`node server.ts`) on 3000.
+      # `--command`, which gcloud rejects. --command "" / --args "" clear the entrypoint
+      # override left on the service from when AI Studio deployed it, so the Buildpacks launcher
+      # runs `npm start` (`node server.ts`) on 3000.
       # --max-instances 1: the /api/describe rate limit (server/rateLimit.ts) is kept in memory per
       # instance, so more instances would multiply how much of the OpenRouter key one person can use.
       # No --set-env-vars / --clear-env-vars, so OPENROUTER_API_KEY and other settings stay as they are.
