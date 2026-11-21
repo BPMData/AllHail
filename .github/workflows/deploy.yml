@@ -24,9 +24,9 @@ jobs:
         with:
           node-version: 24
 
-      # No package-lock.json in this repo yet, so install from package.json.
+      # Install the exact versions in package-lock.json.
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck

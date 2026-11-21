@@ -13,9 +13,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      # No package-lock.json in this repo yet, so `npm ci` (which needs it) can't be used.
-      # Install from package.json instead, the same way OverHeard's CI does.
-      - run: npm install --no-audit --no-fund
+      # Install the exact versions in package-lock.json.
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
       - run: npm test

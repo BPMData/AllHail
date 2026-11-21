@@ -25,12 +25,12 @@ AllHail is an installable web app for blind and low-vision students and their te
 Use **Node 24 LTS** (`nvm use` if you use nvm). Node 22.18 or later also supports the server's native TypeScript execution.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run dev
 ```
 
-This repo has no `package-lock.json` yet, so use `npm install`, not `npm ci`.
+`npm ci` installs the exact versions in `package-lock.json`. Use `npm install` only when you add or update a dependency, and commit the updated lock file with it.
 
 Open `http://localhost:3000`. To describe photos, put an OpenRouter key in `.env` as `OPENROUTER_API_KEY`. Without one, `POST /api/describe` replies "Photo descriptions are not configured on the server yet.", and everything else still works. The development server updates the browser when you edit files. Its service worker is disabled so old cached files don't hide your edits.
 
