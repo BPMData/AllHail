@@ -1,8 +1,16 @@
 # AllHail
 
-AllHail is an installable web app for blind and low-vision students and their teachers. It will turn photos, documents and typed text into speech, alongside OverBoard, AllAboard and OverHeard.
+AllHail is an installable web app for blind and low-vision students and their teachers. It turns photos, documents and typed text into speech, alongside OverBoard, AllAboard and OverHeard.
 
-This branch completes **step 2 of [the rebuild plan](PLAN.md)**: the project foundation. It has an accessible home screen, install instructions, connection announcements and an offline app shell. Camera capture, AI descriptions, document reading and speech come in later steps.
+- Camera capture with a full-screen viewfinder, one-tap shutter, and haptic feedback.
+- Two description modes:
+  - Quick look — a short overview (60–150 words) to get your bearings.
+  - Full detail — everything a sighted classmate could study: all text, handwriting, circled answers, grades, and a full visual description area by area.
+- On-device speech chain with ordered fallback: device voice (speechSynthesis), Kokoro (runs in the browser, 90 MB one-time download), Google Cloud free allowances, and Lemonfox. A long job never changes voice halfway through.
+- Offline first: Kokoro and device voices work without the internet. With no connection, the app says plainly that photos can't be described right now; typed text and documents still speak.
+- History of recent descriptions saved on the device (IndexedDB).
+- Screen-reader ready: every control has a label, status is announced ("Describing...", "Ready"), and the app is tested with VoiceOver and TalkBack.
+- No accounts, no uploads beyond the description request. Photos are stripped of EXIF and resized on-device before the AI sees them.
 
 ## Run it locally
 
@@ -24,14 +32,6 @@ NODE_ENV=production npm start
 ```
 
 The server serves the built app when `NODE_ENV=production`, or when it runs on Cloud Run (which sets `K_SERVICE`), even if `NODE_ENV` is missing. `NODE_ENV=development` always means the development server.
-
-### Deploying with Google AI Studio
-
-- AI Studio's Publish builds the app, starts it with `node server.ts` on Cloud Run, and can rewrite the service's settings. Anything that must survive a publish belongs in code, not in console settings. That's why production is detected from `K_SERVICE` as well as `NODE_ENV`.
-- Keep `PORT=3000`; don't "fix" it to 8080 (see AllAboard's deployment notes).
-- `metadata.json` names the app and asks for the camera, so AI Studio's preview allows it.
-- Keys go in AI Studio's **Secrets** panel, never in the code: `OPENROUTER_API_KEY` from step 3 onwards. AI Studio adds `GEMINI_API_KEY` by itself; AllHail doesn't use it.
-- Test the camera and installing in the published URL in a full Chrome tab, not in AI Studio's preview pane.
 
 `PORT` defaults to `3000`; `HOST` defaults to `0.0.0.0`. Production runs `node server.ts` directly, without a TypeScript loader. `GET /api/health` checks that the server is up. Deployment must serve over HTTPS for installation and offline support; localhost is allowed for development. A phone visiting a laptop's plain HTTP network address cannot use its service worker.
 
@@ -63,6 +63,10 @@ The generated worker caches only the built app files, including local icons and 
 ## Where things live
 
 - `src/`: React app and styles (React 19, Tailwind 4).
+- `src/components/CaptureView.tsx`: student camera mode.
+- `src/components/HistoryView.tsx`: description history.
+- `src/speech/`: on-device and cloud speech pipeline (Kokoro, Piper, device voices, coordinator, MP3 export).
+- `server/describe.ts`: photo description endpoint with model fallback chains.
 - `shared/strings.ts`: all visible text, including HTML and manifest wording.
 - `server.ts`: Express server and development Vite middleware.
 - `vite.config.ts`: build, install manifest and offline cache rules.
