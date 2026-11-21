@@ -12,7 +12,6 @@ test-results/
 *.log
 .env*
 !.env.example
-bun.lock
 
 # Generated during the build from node_modules
 public/ort/
