@@ -10,8 +10,8 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Serve the built app (not the Vite dev server) when NODE_ENV says production, or when running
- * on Cloud Run (which always sets K_SERVICE). AI Studio's Publish has dropped NODE_ENV before;
- * without this, the deploy would try to start Vite, which isn't installed in production.
+ * on Cloud Run (which always sets K_SERVICE). A deploy has dropped NODE_ENV before
+ * (when AI Studio published the app); without this, it would try to start Vite, which isn't installed in production.
  * An explicit NODE_ENV=development still wins, for debugging.
  */
 export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {

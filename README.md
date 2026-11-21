@@ -2,6 +2,8 @@
 
 AllHail is an installable web app for blind and low-vision students and their teachers. It turns photos into speech, alongside OverBoard, AllAboard and OverHeard. Documents and typed text come next (see [PLAN.md](PLAN.md)).
 
+**Open it:** [bpmdata.github.io/allhail](https://bpmdata.github.io/allhail). That short link sends you to the app's Cloud Run address.
+
 - **Camera capture.** The **Quick look** and **Full detail** buttons open the camera, or take a frame from an optional live viewfinder. You can also choose a photo you already have. The phone vibrates when the photo is taken and again when the description is ready.
 - **Two description modes:**
   - **Quick look:** a short overview (60–150 words) to get your bearings.
@@ -28,7 +30,7 @@ cp .env.example .env
 npm run dev
 ```
 
-This repo has no `package-lock.json` (see [AGENTS.md](AGENTS.md)), so use `npm install`, not `npm ci`.
+This repo has no `package-lock.json` yet, so use `npm install`, not `npm ci`.
 
 Open `http://localhost:3000`. To describe photos, put an OpenRouter key in `.env` as `OPENROUTER_API_KEY`. Without one, `POST /api/describe` replies "Photo descriptions are not configured on the server yet.", and everything else still works. The development server updates the browser when you edit files. Its service worker is disabled so old cached files don't hide your edits.
 
@@ -50,6 +52,9 @@ Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/dep
 - The workflow logs in with the `GCP_SA_KEY` repository secret.
 - `OPENROUTER_API_KEY` is set on the Cloud Run service itself. The deploy leaves service variables alone, so it doesn't need setting again.
 - The deploy keeps `--max-instances 1`. The rate limit is kept in memory, so more instances would multiply how much of the key one person can use.
+- `https://bpmdata.github.io/allhail` is a short link that redirects to the service's Cloud Run URL. The redirect isn't in this repo. Because the browser ends up on the Cloud Run address, the installed app, its offline files and its history all belong to that address, not to github.io.
+
+The app used to be built and published in Google AI Studio, but it has moved off AI Studio completely. The deploy still passes `--command ""` and `--args ""` to clear an entrypoint setting AI Studio left on the service.
 
 ## Check changes
 
@@ -74,7 +79,7 @@ None of these checks call real AI or speech services or use real photos. Test ou
 
 ## Install and check offline on a real device
 
-1. Open the production app over HTTPS in Chrome on a laptop or Android phone. Wait for **App saved for offline use**.
+1. Open [bpmdata.github.io/allhail](https://bpmdata.github.io/allhail) in Chrome on a laptop or Android phone, and let it redirect to the Cloud Run address. Wait for **App saved for offline use**.
 2. On a laptop, choose Chrome's install icon in the address bar. On Android, use **Install app** or **Add to Home screen** from Chrome's menu.
 3. Describe a photo or two so the History has something in it. If you want an offline voice, let Kokoro or Piper finish downloading.
 4. Close AllHail, disconnect from the internet, and open it again from its installed icon. Check:

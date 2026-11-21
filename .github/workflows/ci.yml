@@ -13,8 +13,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      # Google AI Studio doesn't keep package-lock.json in this repo, so `npm ci` (which needs it)
-      # can't be used. Install from package.json instead, the same way OverHeard's CI does.
+      # No package-lock.json in this repo yet, so `npm ci` (which needs it) can't be used.
+      # Install from package.json instead, the same way OverHeard's CI does.
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
