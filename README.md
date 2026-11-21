@@ -41,7 +41,7 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-The server serves the built app when `NODE_ENV=production`, or when it runs on Cloud Run (which sets `K_SERVICE`), even if `NODE_ENV` is missing. `NODE_ENV=development` always means the development server.
+The server serves the built app only when `NODE_ENV=production`; otherwise it runs the development server.
 
 `PORT` defaults to `3000`, and `HOST` to `0.0.0.0`. Production runs `node server.ts` directly, with no TypeScript loader. `GET /api/health` checks that the server is up. `/api/describe` allows 20 requests per minute from each address. Deployment must use HTTPS for installation and offline support; localhost is fine for development. A phone visiting a laptop's plain HTTP network address can't use its service worker.
 
@@ -50,11 +50,9 @@ The server serves the built app when `NODE_ENV=production`, or when it runs on C
 Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). It runs the checks below, then deploys the `allhail` Cloud Run service with `gcloud run deploy --source .` on port 3000.
 
 - The workflow logs in with the `GCP_SA_KEY` repository secret.
-- `OPENROUTER_API_KEY` is set on the Cloud Run service itself. The deploy leaves service variables alone, so it doesn't need setting again.
+- `OPENROUTER_API_KEY` is set on the Cloud Run service itself. The deploy sets only `NODE_ENV=production` and leaves the other service variables alone, so the key doesn't need setting again.
 - The deploy keeps `--max-instances 1`. The rate limit is kept in memory, so more instances would multiply how much of the key one person can use.
 - `https://bpmdata.github.io/allhail` is a short link that redirects to the service's Cloud Run URL. The redirect isn't in this repo. Because the browser ends up on the Cloud Run address, the installed app, its offline files and its history all belong to that address, not to github.io.
-
-The app used to be built and published in Google AI Studio, but it has moved off AI Studio completely. The deploy still passes `--command ""` and `--args ""` to clear an entrypoint setting AI Studio left on the service.
 
 ## Check changes
 

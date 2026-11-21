@@ -48,13 +48,11 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Call gcloud directly: deploy-cloudrun's flag parser turns `--command=` into a bare
-      # `--command`, which gcloud rejects. --command "" / --args "" clear the entrypoint
-      # override left on the service from when AI Studio deployed it, so the Buildpacks launcher
-      # runs `npm start` (`node server.ts`) on 3000.
+      # The Buildpacks launcher runs `npm start` (`node server.ts`) on port 3000.
+      # --update-env-vars NODE_ENV=production makes server.ts serve the built app. It adds or
+      # replaces only NODE_ENV, so OPENROUTER_API_KEY and other settings on the service stay as they are.
       # --max-instances 1: the /api/describe rate limit (server/rateLimit.ts) is kept in memory per
       # instance, so more instances would multiply how much of the OpenRouter key one person can use.
-      # No --set-env-vars / --clear-env-vars, so OPENROUTER_API_KEY and other settings stay as they are.
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy allhail \
@@ -64,7 +62,6 @@ jobs:
             --allow-unauthenticated \
             --port 3000 \
             --max-instances 1 \
-            --command "" \
-            --args "" \
+            --update-env-vars NODE_ENV=production \
             --update-labels "managed-by=github-actions,commit-sha=${GITHUB_SHA}" \
             --quiet
