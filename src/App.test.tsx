@@ -605,7 +605,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByRole('status').textContent).toContain(strings.liveViewfinderDenied);
   });
 
-  it('automatically runs the pre-selected Quick look or Full detail mode when uploading via Choose photo', async () => {
+  it('waits for a description mode after choosing a photo and moves focus to the available actions', async () => {
     const { coordinator, kokoroClient, piperClient, spokenTexts, unlockAudioContext } = makeTestRuntime();
     vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
       imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
@@ -637,9 +637,12 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       />,
     );
 
-    // Default pre-selected mode is Quick look -> uploading via Choose photo runs describe immediately
-    fireEvent.click(screen.getByRole('button', { name: strings.choosePhoto }));
-    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('region', { name: strings.selectedPhotoHeading })).toBeNull();
+    expect(screen.queryByRole('radio', { name: strings.modeQuickLookLabel })).toBeNull();
+    const choosePhoto = screen.getByRole('button', { name: strings.choosePhoto });
+    choosePhoto.focus();
+    fireEvent.click(choosePhoto);
+    expect(unlockAudioContext).not.toHaveBeenCalled();
 
     const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
     await act(async () => {
@@ -648,23 +651,28 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('Quick painting overview.')).toBeDefined();
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    const quickLook = screen.getByRole('button', { name: strings.quickLookSamePhoto });
+    expect(document.activeElement).toBe(quickLook);
+    await act(async () => { fireEvent.click(quickLook); });
+    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Quick painting overview.')).toBeDefined();
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).mode).toBe('describe');
     expect(spokenTexts).toEqual(['Quick painting overview.']);
 
-    // Pre-selecting Full detail runs Full detail automatically on the next uploaded photo
-    fireEvent.click(screen.getByRole('radio', { name: strings.modeFullDetailLabel }));
+    choosePhoto.focus();
+    fireEvent.click(choosePhoto);
     await act(async () => {
       fireEvent.change(galleryInput, {
         target: { files: [new File(['photo2'], 'painting2.jpg', { type: 'image/jpeg' })] },
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('Full painted details.')).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.fullDetailSamePhoto }));
     });
+    expect(screen.getByText('Full painted details.')).toBeDefined();
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).mode).toBe('detail');
     expect(spokenTexts).toEqual(['Quick painting overview.', 'Full painted details.']);
     vi.unstubAllGlobals();
@@ -740,6 +748,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
           target: { files: [new File(['photo'], 'water_cycle.png', { type: 'image/png' })] },
         });
       });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: strings.quickLookSamePhoto }));
+      });
       await waitFor(() => {
         expect(screen.getByTestId('download-mp3-button')).toBeDefined();
       });
@@ -775,6 +786,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         });
       });
 
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: strings.quickLookSamePhoto }));
+      });
       await waitFor(() => {
         expect(screen.getByTestId('download-mp3-button')).toBeDefined();
       });
@@ -897,6 +911,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       });
     });
 
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.quickLookSamePhoto }));
+    });
     await waitFor(() => {
       expect(screen.getByText('Original worksheet description with typo.')).toBeDefined();
     });
@@ -1001,6 +1018,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       fireEvent.change(galleryInput2, {
         target: { files: [new File(['photo'], 'worksheet2.png', { type: 'image/png' })] },
       });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: strings.quickLookSamePhoto }));
     });
     await waitFor(() => {
       expect(screen.getByRole('button', { name: strings.copyText })).toBeDefined();

@@ -73,6 +73,8 @@ export function CaptureView({
   const quickCameraInputRef = useRef<HTMLInputElement>(null);
   const detailCameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const choosePhotoRef = useRef<HTMLButtonElement>(null);
+  const quickLookPhotoRef = useRef<HTMLButtonElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +82,7 @@ export function CaptureView({
   const [viewfinderOpen, setViewfinderOpen] = useState(false);
   const [viewfinderReady, setViewfinderReady] = useState(false);
   const [viewfinderMessage, setViewfinderMessage] = useState<string | null>(null);
-  const [selectedMode, setSelectedMode] = useState<PromptMode>('describe');
+  const [focusPhotoActions, setFocusPhotoActions] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
@@ -104,6 +106,15 @@ export function CaptureView({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!focusPhotoActions) return;
+    setFocusPhotoActions(false);
+    const active = document.activeElement;
+    if (active === choosePhotoRef.current || active === galleryInputRef.current || active === document.body) {
+      quickLookPhotoRef.current?.focus();
+    }
+  }, [focusPhotoActions]);
 
   const stopViewfinder = () => {
     if (streamRef.current) {
@@ -154,7 +165,6 @@ export function CaptureView({
   };
 
   const handlePrimaryShutter = async (mode: PromptMode) => {
-    setSelectedMode(mode);
     if (busy) return;
     onUnlockCapture();
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
@@ -195,6 +205,7 @@ export function CaptureView({
         await onDescribePrepared(prepared, autoDescribeMode, file.name);
       } else {
         onStatusAnnouncement(strings.photoLoadedStatus);
+        setFocusPhotoActions(true);
       }
     } catch {
       onStatusAnnouncement(strings.statusPrepFailed);
@@ -202,7 +213,6 @@ export function CaptureView({
   };
 
   const handleSamePhotoDescribe = async (mode: PromptMode) => {
-    setSelectedMode(mode);
     if (!preparedPhoto || busy) return;
     onUnlockCapture();
     if (!online) {
@@ -214,7 +224,6 @@ export function CaptureView({
 
   const handleChoosePhotoClick = () => {
     if (busy) return;
-    onUnlockCapture();
     if (galleryInputRef.current) {
       galleryInputRef.current.value = '';
       galleryInputRef.current.click();
@@ -364,7 +373,7 @@ export function CaptureView({
         tabIndex={-1}
         aria-hidden="true"
         data-testid="gallery-input"
-        onChange={(e) => void handleFilePicked(e.target.files?.[0], selectedMode)}
+        onChange={(e) => void handleFilePicked(e.target.files?.[0], null)}
       />
 
       {/* Left column on desktop / Primary capture controls */}
@@ -377,131 +386,100 @@ export function CaptureView({
         </div>
 
         <div className="panel-body space-y-5">
-        {/* Primary native camera shutter buttons */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <button
-            type="button"
-            disabled={busy}
-            aria-busy={busy}
-            onClick={() => void handlePrimaryShutter('describe')}
-            className="primary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm px-6 py-4 text-left shadow-sm transition active:scale-[0.99] disabled:opacity-60"
-          >
-            <span className="text-2xl font-bold leading-tight">{strings.quickLook}</span>
-            <span className="mt-1 text-sm opacity-90">{strings.quickLookHint}</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={busy}
-            aria-busy={busy}
-            onClick={() => void handlePrimaryShutter('detail')}
-            className="secondary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm border px-6 py-4 text-left transition active:scale-[0.99] disabled:opacity-60"
-          >
-            <span className="text-2xl font-bold leading-tight">{strings.fullDetail}</span>
-            <span className="mt-1 text-sm opacity-90">{strings.fullDetailHint}</span>
-          </button>
-        </div>
-
-        {/* Pre-selected mode for uploaded photos */}
-        <fieldset className="photo-mode">
-          <legend className="px-1 text-sm font-bold">{strings.choosePhotoModeLabel}</legend>
-          <div className="segmented mt-2 grid grid-cols-2">
-            {(
-              [
-                { value: 'describe', label: strings.modeQuickLookLabel },
-                { value: 'detail', label: strings.modeFullDetailLabel },
-              ] as const
-            ).map((option) => {
-              const checked = selectedMode === option.value;
-              return (
-                <label
-                  key={option.value}
-                  className={
-                    checked
-                      ? 'nav-tab-active flex min-h-[48px] cursor-pointer items-center justify-center rounded-sm px-3 py-2 text-center text-sm font-bold focus-within:outline focus-within:outline-4 focus-within:outline-offset-2'
-                      : 'surface-button flex min-h-[48px] cursor-pointer items-center justify-center rounded-sm border px-3 py-2 text-center text-sm font-bold focus-within:outline focus-within:outline-4 focus-within:outline-offset-2'
-                  }
-                >
-                  <input
-                    type="radio"
-                    name="choose-photo-mode"
-                    value={option.value}
-                    checked={checked}
-                    disabled={busy}
-                    onChange={() => setSelectedMode(option.value)}
-                    className="sr-only"
-                  />
-                  <span>{option.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        {/* Existing photo picker + optional live viewfinder toggle */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleChoosePhotoClick}
-            className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold disabled:opacity-60"
-          >
-            {strings.choosePhoto}
-          </button>
-
-          <button
-            type="button"
-            aria-expanded={viewfinderOpen}
-            onClick={() => void toggleViewfinder()}
-            className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold"
-          >
-            {viewfinderOpen ? strings.liveViewfinderHide : strings.liveViewfinderShow}
-          </button>
-        </div>
-
-        {/* Optional live camera viewfinder */}
-        {viewfinderOpen && (
-          <div className="panel-card rounded-sm border p-4">
-            <p className="text-sm font-semibold">{viewfinderMessage ?? strings.liveViewfinderLabel}</p>
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              aria-label={strings.liveViewfinderLabel}
-              className="mt-3 aspect-[4/3] w-full rounded-sm bg-black object-cover"
-            />
-          </div>
-        )}
-
-        {/* Prepared photo preview + re-describe controls */}
-        {preparedPhoto && (
-          <div className="panel-card rounded-sm border p-4">
-            <img
-              src={preparedPhoto.thumbnailDataUrl}
-              alt={strings.selectedPhotoAlt}
-              className="max-h-56 w-full rounded-sm object-contain"
-            />
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div role="group" aria-labelledby="take-photo-label">
+            <p id="take-photo-label" className="mb-2 text-base font-bold">{strings.takePhoto}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void handleSamePhotoDescribe('describe')}
-                className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold disabled:opacity-60"
+                aria-busy={busy}
+                onClick={() => void handlePrimaryShutter('describe')}
+                className="primary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm px-6 py-4 text-left shadow-sm transition active:scale-[0.99] disabled:opacity-60"
               >
-                {strings.quickLookSamePhoto}
+                <span className="text-2xl font-bold leading-tight">{strings.quickLook}</span>
+                <span className="mt-1 text-sm opacity-90">{strings.quickLookHint}</span>
               </button>
+
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void handleSamePhotoDescribe('detail')}
-                className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold disabled:opacity-60"
+                aria-busy={busy}
+                onClick={() => void handlePrimaryShutter('detail')}
+                className="secondary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm border px-6 py-4 text-left transition active:scale-[0.99] disabled:opacity-60"
               >
-                {strings.fullDetailSamePhoto}
+                <span className="text-2xl font-bold leading-tight">{strings.fullDetail}</span>
+                <span className="mt-1 text-sm opacity-90">{strings.fullDetailHint}</span>
               </button>
             </div>
           </div>
-        )}
+
+          {/* Existing photo picker + optional live viewfinder toggle */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={busy}
+              ref={choosePhotoRef}
+              onClick={handleChoosePhotoClick}
+              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold disabled:opacity-60"
+            >
+              {strings.choosePhoto}
+            </button>
+
+            <button
+              type="button"
+              aria-expanded={viewfinderOpen}
+              onClick={() => void toggleViewfinder()}
+              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold"
+            >
+              {viewfinderOpen ? strings.liveViewfinderHide : strings.liveViewfinderShow}
+            </button>
+          </div>
+
+          {/* Optional live camera viewfinder */}
+          {viewfinderOpen && (
+            <div className="panel-card rounded-sm border p-4">
+              <p className="text-sm font-semibold">{viewfinderMessage ?? strings.liveViewfinderLabel}</p>
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                aria-label={strings.liveViewfinderLabel}
+                className="mt-3 aspect-[4/3] w-full rounded-sm bg-black object-cover"
+              />
+            </div>
+          )}
+
+          {/* Prepared photo preview + re-describe controls */}
+          {preparedPhoto && (
+            <section aria-labelledby="selected-photo-heading" className="panel-card rounded-sm border p-4">
+              <h2 id="selected-photo-heading" className="mb-3 text-base font-bold">{strings.selectedPhotoHeading}</h2>
+              <img
+                src={preparedPhoto.thumbnailDataUrl}
+                alt={strings.selectedPhotoAlt}
+                className="max-h-56 w-full rounded-sm object-contain"
+              />
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  aria-disabled={busy}
+                  ref={quickLookPhotoRef}
+                  onClick={() => void handleSamePhotoDescribe('describe')}
+                  className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
+                >
+                  {strings.quickLookSamePhoto}
+                </button>
+                <button
+                  type="button"
+                  aria-disabled={busy}
+                  onClick={() => void handleSamePhotoDescribe('detail')}
+                  className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
+                >
+                  {strings.fullDetailSamePhoto}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
       </section>
 

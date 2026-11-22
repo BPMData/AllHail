@@ -35,6 +35,7 @@ export const strings = {
   // Student camera screen
   studentHeading: 'Describe a photo',
   studentLead: 'Take a photo or choose one to hear what is in front of you.',
+  takePhoto: 'Take a photo',
   quickLook: 'Quick look',
   quickLookHint: 'Short 60 to 150 word overview',
   fullDetail: 'Full detail',
@@ -43,7 +44,6 @@ export const strings = {
   fullDetailSamePhoto: 'Full detail on this photo',
   choosePhoto: 'Choose photo',
   choosePhotoHint: 'Pick an existing picture from your device',
-  choosePhotoModeLabel: 'For chosen photos, run',
   liveViewfinderShow: 'Open live viewfinder',
   liveViewfinderHide: 'Close live viewfinder',
   liveViewfinderLabel: 'Live camera viewfinder',
@@ -51,6 +51,7 @@ export const strings = {
   liveViewfinderStarting: 'Starting camera viewfinder…',
   liveViewfinderDenied: 'Camera access was blocked. Use Quick look or Full detail to open your phone camera, or choose an existing photo.',
   liveViewfinderUnsupported: 'Live viewfinder is not available here. Use Quick look, Full detail, or choose a photo.',
+  selectedPhotoHeading: 'Selected photo',
   selectedPhotoAlt: 'Prepared photo preview',
   photoLoadedStatus: 'Photo loaded. Choose Quick look or Full detail.',
 
