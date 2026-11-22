@@ -17,19 +17,28 @@ export type DescriptionResult = {
   createdAt: number;
 };
 
+export type PhotoSelection = {
+  photo: PreparedPhoto;
+  sourceName?: string;
+  initialMode: PromptMode;
+  mode: PromptMode;
+};
+
 type CaptureViewProps = {
   online: boolean;
   busy: boolean;
   mp3Busy?: boolean;
   mp3ProgressLabel?: string | null;
-  preparedPhoto: PreparedPhoto | null;
+  selectedPhoto: PhotoSelection | null;
+  selectedMode: PromptMode;
+  onModeChange: (mode: PromptMode) => void;
+  onSwitchPhotoMode: (mode: PromptMode) => Promise<void>;
   currentResult: DescriptionResult | null;
   speechStatus: SpeechStatusSnapshot;
   lastVoiceUsed: VoiceProviderId | null;
   settings: AppSettings;
   onUnlockCapture: () => void;
   onUnlockPlayback: () => void;
-  onPreparedPhoto: (photo: PreparedPhoto, sourceName?: string) => void;
   onDescribePrepared: (photo: PreparedPhoto, mode: PromptMode, sourceName?: string) => Promise<void>;
   onDownloadMp3?: (result: DescriptionResult) => void;
   onCopyText?: (text: string) => void;
@@ -49,14 +58,16 @@ export function CaptureView({
   busy,
   mp3Busy = false,
   mp3ProgressLabel = null,
-  preparedPhoto,
+  selectedPhoto,
+  selectedMode,
+  onModeChange,
+  onSwitchPhotoMode,
   currentResult,
   speechStatus,
   lastVoiceUsed,
   settings,
   onUnlockCapture,
   onUnlockPlayback,
-  onPreparedPhoto,
   onDescribePrepared,
   onDownloadMp3,
   onCopyText,
@@ -70,11 +81,8 @@ export function CaptureView({
   onStopSpeech,
   onRateChange,
 }: CaptureViewProps) {
-  const quickCameraInputRef = useRef<HTMLInputElement>(null);
-  const detailCameraInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const choosePhotoRef = useRef<HTMLButtonElement>(null);
-  const quickLookPhotoRef = useRef<HTMLButtonElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +90,8 @@ export function CaptureView({
   const [viewfinderOpen, setViewfinderOpen] = useState(false);
   const [viewfinderReady, setViewfinderReady] = useState(false);
   const [viewfinderMessage, setViewfinderMessage] = useState<string | null>(null);
-  const [focusPhotoActions, setFocusPhotoActions] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const photoBusy = busy || preparing;
   const [editing, setEditing] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
@@ -106,15 +115,6 @@ export function CaptureView({
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!focusPhotoActions) return;
-    setFocusPhotoActions(false);
-    const active = document.activeElement;
-    if (active === choosePhotoRef.current || active === galleryInputRef.current || active === document.body) {
-      quickLookPhotoRef.current?.focus();
-    }
-  }, [focusPhotoActions]);
 
   const stopViewfinder = () => {
     if (streamRef.current) {
@@ -164,8 +164,8 @@ export function CaptureView({
     }
   };
 
-  const handlePrimaryShutter = async (mode: PromptMode) => {
-    if (busy) return;
+  const handlePrimaryShutter = async () => {
+    if (photoBusy) return;
     onUnlockCapture();
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(25);
@@ -177,57 +177,44 @@ export function CaptureView({
     }
 
     if (viewfinderOpen && viewfinderReady && videoRef.current) {
+      setPreparing(true);
       onStatusAnnouncement(strings.statusPreparing);
       try {
         const prepared = await prepareVideoFrame(videoRef.current);
-        onPreparedPhoto(prepared);
-        await onDescribePrepared(prepared, mode);
+        await onDescribePrepared(prepared, selectedMode);
       } catch {
         onStatusAnnouncement(strings.statusPrepFailed);
+      } finally {
+        setPreparing(false);
       }
       return;
     }
 
-    const input = mode === 'describe' ? quickCameraInputRef.current : detailCameraInputRef.current;
-    if (input) {
-      input.value = '';
-      input.click();
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
     }
   };
 
-  const handleFilePicked = async (file: File | undefined, autoDescribeMode: PromptMode | null) => {
-    if (!file) return;
+  const handleFilePicked = async (file: File | undefined) => {
+    if (!file || photoBusy) return;
+    setPreparing(true);
     onStatusAnnouncement(strings.statusPreparing);
     try {
       const prepared = await preparePhotoBlob(file);
-      onPreparedPhoto(prepared, file.name);
-      if (autoDescribeMode) {
-        await onDescribePrepared(prepared, autoDescribeMode, file.name);
-      } else {
-        onStatusAnnouncement(strings.photoLoadedStatus);
-        setFocusPhotoActions(true);
-      }
+      await onDescribePrepared(prepared, selectedMode, file.name);
     } catch {
       onStatusAnnouncement(strings.statusPrepFailed);
+    } finally {
+      setPreparing(false);
     }
-  };
-
-  const handleSamePhotoDescribe = async (mode: PromptMode) => {
-    if (!preparedPhoto || busy) return;
-    onUnlockCapture();
-    if (!online) {
-      onStatusAnnouncement(strings.statusOfflineCannotDescribe);
-      return;
-    }
-    await onDescribePrepared(preparedPhoto, mode);
   };
 
   const handleChoosePhotoClick = () => {
-    if (busy) return;
-    if (galleryInputRef.current) {
-      galleryInputRef.current.value = '';
-      galleryInputRef.current.click();
-    }
+    if (photoBusy || !galleryInputRef.current) return;
+    onUnlockPlayback();
+    galleryInputRef.current.value = '';
+    galleryInputRef.current.click();
   };
 
   const handleReaderCardClick = () => {
@@ -340,30 +327,25 @@ export function CaptureView({
           ? strings.voiceDeviceLabel
           : null;
 
+  const alternativeMode = selectedPhoto && (selectedPhoto.mode === 'detail' ? 'describe' : 'detail');
+  const returningToInitialMode = alternativeMode === selectedPhoto?.initialMode;
+  const alternativeLabel = alternativeMode === 'describe'
+    ? returningToInitialMode ? strings.backToQuickLookOnPhoto : strings.quickLookOnPhotoInstead
+    : returningToInitialMode ? strings.backToFullDetailOnPhoto : strings.fullDetailOnPhotoInstead;
+
   return (
     <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
       {/* Hidden native camera and file inputs */}
       <input
-        ref={quickCameraInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
-        data-testid="camera-input-describe"
-        onChange={(e) => void handleFilePicked(e.target.files?.[0], 'describe')}
-      />
-      <input
-        ref={detailCameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        data-testid="camera-input-detail"
-        onChange={(e) => void handleFilePicked(e.target.files?.[0], 'detail')}
+        data-testid="camera-input"
+        onChange={(e) => void handleFilePicked(e.target.files?.[0])}
       />
       <input
         ref={galleryInputRef}
@@ -373,7 +355,7 @@ export function CaptureView({
         tabIndex={-1}
         aria-hidden="true"
         data-testid="gallery-input"
-        onChange={(e) => void handleFilePicked(e.target.files?.[0], null)}
+        onChange={(e) => void handleFilePicked(e.target.files?.[0])}
       />
 
       {/* Left column on desktop / Primary capture controls */}
@@ -386,41 +368,45 @@ export function CaptureView({
         </div>
 
         <div className="panel-body space-y-5">
-          <div role="group" aria-labelledby="take-photo-label">
-            <p id="take-photo-label" className="mb-2 text-base font-bold">{strings.takePhoto}</p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <button
-                type="button"
-                disabled={busy}
-                aria-busy={busy}
-                onClick={() => void handlePrimaryShutter('describe')}
-                className="primary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm px-6 py-4 text-left shadow-sm transition active:scale-[0.99] disabled:opacity-60"
-              >
-                <span className="text-2xl font-bold leading-tight">{strings.quickLook}</span>
-                <span className="mt-1 text-sm opacity-90">{strings.quickLookHint}</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={busy}
-                aria-busy={busy}
-                onClick={() => void handlePrimaryShutter('detail')}
-                className="secondary-cta flex min-h-[76px] w-full flex-col items-start justify-center rounded-sm border px-6 py-4 text-left transition active:scale-[0.99] disabled:opacity-60"
-              >
-                <span className="text-2xl font-bold leading-tight">{strings.fullDetail}</span>
-                <span className="mt-1 text-sm opacity-90">{strings.fullDetailHint}</span>
-              </button>
+          <div role="group" aria-labelledby="description-mode-label">
+            <p id="description-mode-label" className="mb-2 text-base font-bold">{strings.descriptionMode}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                { mode: 'describe', label: strings.quickLook, hint: strings.quickLookHint },
+                { mode: 'detail', label: strings.fullDetail, hint: strings.fullDetailHint },
+              ] as const).map(({ mode, label, hint }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={selectedMode === mode}
+                  aria-disabled={photoBusy}
+                  aria-labelledby={`description-mode-name-${mode}`}
+                  aria-describedby={`description-mode-hint-${mode}`}
+                  onClick={() => { if (!photoBusy) onModeChange(mode); }}
+                  className={`${selectedMode === mode ? 'nav-tab-active' : 'surface-button'} min-h-[48px] rounded-sm px-3 py-2 text-left`}
+                >
+                  <span id={`description-mode-name-${mode}`} className="block font-bold">{label}</span>
+                  <span id={`description-mode-hint-${mode}`} className="block text-sm">{hint}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Existing photo picker + optional live viewfinder toggle */}
+          <button
+            type="button"
+            aria-disabled={photoBusy}
+            onClick={() => void handlePrimaryShutter()}
+            className="primary-cta photo-shutter w-full rounded-sm px-6 py-4 text-xl font-bold aria-disabled:opacity-60"
+          >
+            {strings.takePhoto}
+          </button>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
-              disabled={busy}
-              ref={choosePhotoRef}
+              aria-disabled={photoBusy}
               onClick={handleChoosePhotoClick}
-              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold disabled:opacity-60"
+              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm px-4 py-3 text-base font-bold aria-disabled:opacity-60"
             >
               {strings.choosePhoto}
             </button>
@@ -450,34 +436,22 @@ export function CaptureView({
             </div>
           )}
 
-          {/* Prepared photo preview + re-describe controls */}
-          {preparedPhoto && (
+          {selectedPhoto && alternativeMode && (
             <section aria-labelledby="selected-photo-heading" className="panel-card rounded-sm border p-4">
               <h2 id="selected-photo-heading" className="mb-3 text-base font-bold">{strings.selectedPhotoHeading}</h2>
               <img
-                src={preparedPhoto.thumbnailDataUrl}
+                src={selectedPhoto.photo.thumbnailDataUrl}
                 alt={strings.selectedPhotoAlt}
                 className="max-h-56 w-full rounded-sm object-contain"
               />
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  aria-disabled={busy}
-                  ref={quickLookPhotoRef}
-                  onClick={() => void handleSamePhotoDescribe('describe')}
-                  className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
-                >
-                  {strings.quickLookSamePhoto}
-                </button>
-                <button
-                  type="button"
-                  aria-disabled={busy}
-                  onClick={() => void handleSamePhotoDescribe('detail')}
-                  className="surface-button min-h-[48px] rounded-sm border px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
-                >
-                  {strings.fullDetailSamePhoto}
-                </button>
-              </div>
+              <button
+                type="button"
+                aria-disabled={photoBusy}
+                onClick={() => { if (!photoBusy) void onSwitchPhotoMode(alternativeMode); }}
+                className="surface-button mt-3 min-h-[48px] rounded-sm px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
+              >
+                {alternativeLabel}
+              </button>
             </section>
           )}
         </div>

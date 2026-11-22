@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { PromptMode } from '../shared/prompts.ts';
 import { strings } from '../shared/strings.ts';
-import { CaptureView, type DescriptionResult } from './components/CaptureView.tsx';
+import { CaptureView, type DescriptionResult, type PhotoSelection } from './components/CaptureView.tsx';
 import { HistoryView } from './components/HistoryView.tsx';
 import { InfoSettingsView } from './components/InfoSettingsView.tsx';
 import { KokoroBanner } from './components/KokoroBanner.tsx';
@@ -140,8 +140,8 @@ export function App({
   const [mp3Busy, setMp3Busy] = useState(false);
   const [mp3Progress, setMp3Progress] = useState<{ done: number; total: number } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [preparedPhoto, setPreparedPhoto] = useState<PreparedPhoto | null>(null);
-  const [preparedPhotoSourceName, setPreparedPhotoSourceName] = useState<string | undefined>(undefined);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoSelection | null>(null);
+  const [selectedMode, setSelectedMode] = useState<PromptMode>('describe');
   const [currentResult, setCurrentResult] = useState<DescriptionResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [savedVisible, setSavedVisible] = useState(false);
@@ -595,7 +595,6 @@ export function App({
         return;
       }
 
-      const resolvedSourceName = sourceName ?? preparedPhotoSourceName;
       const entry: HistoryEntry = {
         id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -604,7 +603,7 @@ export function App({
         mode: data.mode ?? mode,
         model: data.model ?? 'vision',
         text: data.text,
-        sourceName: resolvedSourceName,
+        sourceName,
         thumbnailDataUrl: photo.thumbnailDataUrl,
       };
 
@@ -627,6 +626,23 @@ export function App({
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleNewPhoto = async (photo: PreparedPhoto, mode: PromptMode, sourceName?: string) => {
+    setSelectedPhoto({ photo, sourceName, mode, initialMode: mode });
+    await handleDescribePrepared(photo, mode, sourceName);
+  };
+
+  const handleSwitchPhotoMode = async (mode: PromptMode) => {
+    if (!selectedPhoto || busy) return;
+    if (!online) {
+      setStatusMessage(strings.statusOfflineCannotDescribe);
+      return;
+    }
+    handleUnlockCapture();
+    setSelectedMode(mode);
+    setSelectedPhoto({ ...selectedPhoto, mode });
+    await handleDescribePrepared(selectedPhoto.photo, mode, selectedPhoto.sourceName);
   };
 
   const mp3Provider = useMemo(
@@ -914,18 +930,17 @@ export function App({
                       .replace('{total}', String(mp3Progress.total))
                   : null
               }
-              preparedPhoto={preparedPhoto}
+              selectedPhoto={selectedPhoto}
+              selectedMode={selectedMode}
+              onModeChange={setSelectedMode}
+              onSwitchPhotoMode={handleSwitchPhotoMode}
               currentResult={currentResult}
               speechStatus={speechStatus}
               lastVoiceUsed={lastVoiceUsed}
               settings={settings}
               onUnlockCapture={handleUnlockCapture}
               onUnlockPlayback={handleUnlockPlayback}
-              onPreparedPhoto={(photo, sourceName) => {
-                setPreparedPhoto(photo);
-                setPreparedPhotoSourceName(sourceName);
-              }}
-              onDescribePrepared={handleDescribePrepared}
+              onDescribePrepared={handleNewPhoto}
               onDownloadMp3={(result) => void handleDownloadMp3(result)}
               onCopyText={(text) => void handleCopyText(text)}
               onSaveEdit={handleSaveEdit}
