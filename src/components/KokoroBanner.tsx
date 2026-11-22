@@ -66,13 +66,13 @@ export function KokoroBanner({
         aria-label={label}
         data-testid="kokoro-banner"
         data-voice={activeError.kind}
-        className="panel-card mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3"
+        className="panel-card mb-4 flex flex-wrap items-center justify-between gap-3 rounded-sm border px-4 py-3"
       >
         <p className="text-base font-bold">{message}</p>
         <button
           type="button"
           onClick={activeError.onRetry}
-          className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+          className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
         >
           {strings.kokoroRetryButton}
         </button>
@@ -96,7 +96,7 @@ export function KokoroBanner({
       aria-label={bannerTitle}
       data-testid="kokoro-banner"
       data-voice={activeDownload!.kind}
-      className="panel-card mb-4 rounded-2xl border-2 px-4 py-3"
+      className="panel-card mb-4 rounded-sm border px-4 py-3"
     >
       <p className="text-base font-bold">{bannerTitle}</p>
 

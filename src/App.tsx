@@ -836,14 +836,16 @@ export function App({
       <a className="skip-link" href="#main">{strings.skipLink}</a>
 
       <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-8 lg:pb-12 lg:pt-8">
-        <header className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b pb-4">
+        <header className="app-header mb-4 flex flex-wrap items-center justify-between gap-4 border px-4 py-3">
           <div className="flex items-center gap-3">
-            <img src="/icons/icon.svg" alt="" width="48" height="48" className="shrink-0 rounded-xl" />
+            <img src="/icons/icon.svg" alt="" width="48" height="48" className="shrink-0 rounded-sm" />
             <div>
               <p className="text-2xl font-bold tracking-tight">{strings.appName}</p>
               <p className="text-sm opacity-85">{strings.suite}</p>
             </div>
           </div>
+
+          <div aria-hidden="true" className="connection-pill">{online ? strings.online : strings.offline}</div>
 
           {/* Desktop & tablet top navigation */}
           <nav aria-label={strings.navLabel} className="hidden gap-2 lg:flex">
@@ -855,8 +857,8 @@ export function App({
                 onClick={() => setActiveTab(tab.id)}
                 className={
                   activeTab === tab.id
-                    ? 'nav-tab-active min-h-[48px] rounded-xl px-5 py-2 text-base font-bold'
-                    : 'nav-tab-idle surface-button min-h-[48px] rounded-xl border-2 px-5 py-2 text-base font-bold'
+                    ? 'nav-tab-active min-h-[48px] rounded-sm px-5 py-2 text-base font-bold'
+                    : 'nav-tab-idle surface-button min-h-[48px] rounded-sm border px-5 py-2 text-base font-bold'
                 }
               >
                 {tab.label}
@@ -881,11 +883,11 @@ export function App({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            className="status-panel mb-6 rounded-2xl border-2 px-4 py-3 text-base"
+            className={statusMessage || cacheError || needRefresh ? "status-panel mb-6 rounded-sm border px-4 py-3 text-base" : "sr-only"}
           >
-            <p className="font-bold">{online ? strings.online : strings.offline}</p>
+            <p className="sr-only">{online ? strings.online : strings.offline}</p>
             {statusMessage && <p className="mt-1 font-semibold">{statusMessage}</p>}
-            {offlineReady && <p className="mt-1">{strings.offlineReady}</p>}
+            {offlineReady && <p className="sr-only">{strings.offlineReady}</p>}
             {cacheError && <p className="mt-1">{strings.offlineError}</p>}
             {needRefresh && <p className="mt-1">{strings.updateReady}</p>}
           </div>
@@ -893,7 +895,7 @@ export function App({
           {needRefresh && (
             <button
               type="button"
-              className="update-button mb-6 rounded-xl px-6 py-3 font-bold"
+              className="update-button mb-6 rounded-sm px-6 py-3 font-bold"
               onClick={() => void handleUpdate()}
             >
               {strings.update}

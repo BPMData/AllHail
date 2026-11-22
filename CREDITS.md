@@ -40,3 +40,7 @@ AllHail is free and non-commercial. **Don't sell it or charge for it** while it 
 ## Services
 
 Photo descriptions are written by AI models reached through [OpenRouter](https://openrouter.ai): Anthropic Claude Haiku, Z.ai GLM and Google Gemini Flash-Lite. Their outputs are covered by each provider's terms, not by this licence.
+
+## Fonts
+
+- Atkinson Hyperlegible, by the Braille Institute, is distributed under the [SIL Open Font License 1.1](https://brailleinstitute.org/freefont). The license is included in `public/fonts/OFL-AtkinsonHyperlegible.txt`.

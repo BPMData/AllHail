@@ -53,7 +53,7 @@ export function HistoryView({
           <button
             type="button"
             onClick={handleClearClick}
-            className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+            className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
           >
             {confirmClear ? strings.historyConfirmClear : strings.historyClearAll}
           </button>
@@ -61,7 +61,7 @@ export function HistoryView({
       </div>
 
       {entries.length === 0 ? (
-        <div className="panel-card rounded-2xl border-2 p-6">
+        <div className="panel-card rounded-sm border p-6">
           <p className="text-lg">{strings.historyEmpty}</p>
         </div>
       ) : (
@@ -74,13 +74,13 @@ export function HistoryView({
               entry.text.length > 180 ? `${entry.text.slice(0, 180).trimEnd()}…` : entry.text;
 
             return (
-              <li key={entry.id} className="panel-card rounded-2xl border-2 p-4 sm:p-5">
+              <li key={entry.id} className="panel-card rounded-sm border p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   {entry.thumbnailDataUrl && (
                     <img
                       src={entry.thumbnailDataUrl}
                       alt=""
-                      className="h-24 w-24 shrink-0 rounded-xl object-cover"
+                      className="h-24 w-24 shrink-0 rounded-sm object-cover"
                     />
                   )}
                   <div className="min-w-0 flex-1">
@@ -93,14 +93,14 @@ export function HistoryView({
                       <button
                         type="button"
                         onClick={() => onPlayEntry(entry)}
-                        className="primary-cta min-h-[48px] rounded-xl px-4 py-2 text-base font-bold"
+                        className="primary-cta min-h-[48px] rounded-sm px-4 py-2 text-base font-bold"
                       >
                         {strings.historyPlay}
                       </button>
                       <button
                         type="button"
                         onClick={() => onOpenEntry(entry)}
-                        className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                        className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
                       >
                         {strings.historyOpen}
                       </button>
@@ -108,7 +108,7 @@ export function HistoryView({
                         <button
                           type="button"
                           onClick={() => onCopyText(entry.text)}
-                          className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                          className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
                         >
                           {strings.copyText}
                         </button>
@@ -119,7 +119,7 @@ export function HistoryView({
                           disabled={mp3Busy}
                           aria-busy={mp3Busy}
                           onClick={() => onDownloadMp3(entry)}
-                          className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold disabled:opacity-60"
+                          className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold disabled:opacity-60"
                         >
                           {mp3Busy ? strings.downloadingMp3 : strings.historyDownloadMp3}
                         </button>
@@ -127,7 +127,7 @@ export function HistoryView({
                       <button
                         type="button"
                         onClick={() => onDeleteEntry(entry.id)}
-                        className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                        className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
                       >
                         {strings.historyDelete}
                       </button>
