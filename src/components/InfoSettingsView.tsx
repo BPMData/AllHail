@@ -116,7 +116,7 @@ export function InfoSettingsView({
 
   return (
     <div className="space-y-8">
-      <section aria-labelledby="settings-heading" className="panel-card rounded-3xl border-2 p-5 sm:p-6">
+      <section aria-labelledby="settings-heading" className="panel-card rounded-sm border p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 id="settings-heading" className="text-3xl font-bold leading-tight">
             {strings.settingsHeading}
@@ -126,7 +126,7 @@ export function InfoSettingsView({
           {savedVisible && (
             <span
               data-testid="settings-saved-badge"
-              className="saved-badge inline-flex items-center gap-1 rounded-xl border-2 px-3 py-1 text-sm font-bold"
+              className="saved-badge inline-flex items-center gap-1 rounded-sm border px-3 py-1 text-sm font-bold"
             >
               ✓ {strings.settingsSaved}
             </span>
@@ -194,8 +194,8 @@ export function InfoSettingsView({
                   onClick={() => onUpdateSettings({ speechRate: rate })}
                   className={
                     selected
-                      ? 'primary-cta min-h-[48px] min-w-[60px] rounded-xl px-3 py-2 text-base font-bold'
-                      : 'surface-button min-h-[48px] min-w-[60px] rounded-xl border-2 px-3 py-2 text-base font-bold'
+                      ? 'primary-cta min-h-[48px] min-w-[60px] rounded-sm px-3 py-2 text-base font-bold'
+                      : 'surface-button min-h-[48px] min-w-[60px] rounded-sm border px-3 py-2 text-base font-bold'
                   }
                 >
                   {rate}×
@@ -214,7 +214,7 @@ export function InfoSettingsView({
             id="voice-order-select"
             value={settings.voiceOrder}
             onChange={(e) => onUpdateSettings({ voiceOrder: e.target.value as VoiceOrderPreference })}
-            className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
+            className="surface-button mt-2 min-h-[48px] w-full rounded-sm border px-4 py-2 text-base font-semibold"
           >
             <option value="auto">{strings.voiceOrderAuto}</option>
             <option value="kokoro-first">{strings.voiceOrderKokoroFirst}</option>
@@ -232,7 +232,7 @@ export function InfoSettingsView({
             id="device-voice-select"
             value={settings.deviceVoiceName ?? ''}
             onChange={(e) => onSelectDeviceVoice(e.target.value ? e.target.value : null)}
-            className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
+            className="surface-button mt-2 min-h-[48px] w-full rounded-sm border px-4 py-2 text-base font-semibold"
           >
             <option value="">{strings.deviceVoiceAuto}</option>
             {settings.deviceVoiceName &&
@@ -293,7 +293,7 @@ export function InfoSettingsView({
             <button
               type="button"
               onClick={onRetryKokoro}
-              className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+              className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
             >
               {strings.kokoroRetryButton}
             </button>
@@ -307,7 +307,7 @@ export function InfoSettingsView({
               id="kokoro-voice-select"
               value={settings.kokoroVoiceId}
               onChange={(e) => onSelectKokoroVoice(e.target.value)}
-              className="surface-button mt-2 min-h-[48px] w-full rounded-xl border-2 px-4 py-2 text-base font-semibold"
+              className="surface-button mt-2 min-h-[48px] w-full rounded-sm border px-4 py-2 text-base font-semibold"
             >
               {KOKORO_VOICES.map((voice) => (
                 <option key={voice.id} value={voice.id}>
@@ -363,7 +363,7 @@ export function InfoSettingsView({
               <button
                 type="button"
                 onClick={onDownloadPiper}
-                className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
               >
                 {strings.piperDownloadButtonTemplate.replace('{size}', piperSizeText)}
               </button>
@@ -373,7 +373,7 @@ export function InfoSettingsView({
               <button
                 type="button"
                 onClick={onRetryPiper}
-                className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+                className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
               >
                 {strings.kokoroRetryButton}
               </button>
@@ -382,7 +382,7 @@ export function InfoSettingsView({
             <button
               type="button"
               onClick={onPreviewPiper}
-              className="surface-button min-h-[48px] rounded-xl border-2 px-4 py-2 text-base font-bold"
+              className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
             >
               {strings.piperPreviewButton}
             </button>
@@ -401,7 +401,7 @@ export function InfoSettingsView({
         {needRefresh && (
           <button
             type="button"
-            className="update-button rounded-xl px-6 py-3 font-bold"
+            className="update-button rounded-sm px-6 py-3 font-bold"
             onClick={onUpdateApp}
           >
             {strings.update}

@@ -978,7 +978,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.queryByRole('button', { name: strings.editDescription })).toBeNull();
     expect(screen.queryByRole('button', { name: strings.resetToOriginal })).toBeNull();
     expect(screen.queryByRole('button', { name: strings.bringBackEdits })).toBeNull();
-    expect(screen.getByRole('button', { name: strings.readerTapToPause })).toBeDefined();
+    const reader = screen.getByRole('button', { name: strings.readerTapToPause });
+    expect(reader.getAttribute('aria-describedby')).toBe('reader-description');
+    expect(document.getElementById('reader-description')?.textContent).toBeTruthy();
     expect(screen.getByRole('button', { name: strings.copyText })).toBeDefined();
 
     // Re-mounting the app (simulating reopening after closing) preserves disableEditing = true
