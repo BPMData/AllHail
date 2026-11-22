@@ -142,12 +142,9 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(main.tabIndex).toBe(-1);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(strings.studentHeading);
 
-    const quickInput = screen.getByTestId('camera-input-describe') as HTMLInputElement;
-    const detailInput = screen.getByTestId('camera-input-detail') as HTMLInputElement;
-    expect(quickInput.getAttribute('accept')).toBe('image/*');
-    expect(quickInput.getAttribute('capture')).toBe('environment');
-    expect(detailInput.getAttribute('accept')).toBe('image/*');
-    expect(detailInput.getAttribute('capture')).toBe('environment');
+    const cameraInput = screen.getByTestId('camera-input') as HTMLInputElement;
+    expect(cameraInput.getAttribute('accept')).toBe('image/*');
+    expect(cameraInput.getAttribute('capture')).toBe('environment');
 
     const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
     expect(galleryInput.getAttribute('accept')).toBe('image/*');
@@ -287,13 +284,12 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       />,
     );
 
-    const quickBtn = screen.getByRole('button', { name: new RegExp(strings.quickLook) });
-    fireEvent.click(quickBtn);
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
 
     expect(unlockAudioContext).toHaveBeenCalledTimes(1);
     expect(cueCalls.map((c) => c.cue)).toEqual([strings.statusShortCue]);
 
-    const cameraInput = screen.getByTestId('camera-input-describe') as HTMLInputElement;
+    const cameraInput = screen.getByTestId('camera-input') as HTMLInputElement;
     const fakeFile = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
     await act(async () => {
       fireEvent.change(cameraInput, { target: { files: [fakeFile] } });
@@ -326,7 +322,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(autoReadToggle.checked).toBe(false);
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
-    const sameFullDetail = screen.getByRole('button', { name: strings.fullDetailSamePhoto });
+    const sameFullDetail = screen.getByRole('button', { name: strings.fullDetailOnPhotoInstead });
     await act(async () => {
       fireEvent.click(sameFullDetail);
     });
@@ -558,7 +554,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     });
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabCamera })[0]);
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(strings.quickLook) }));
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
     expect(cueCalls[0]).toEqual({
       cue: strings.statusShortCue,
       deviceVoiceName: 'Allison (Enhanced)',
@@ -605,7 +601,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByRole('status').textContent).toContain(strings.liveViewfinderDenied);
   });
 
-  it('automatically runs the pre-selected Quick look or Full detail mode when uploading via Choose photo', async () => {
+  it('uses the chosen mode immediately and offers only the other mode for the same photo', async () => {
     const { coordinator, kokoroClient, piperClient, spokenTexts, unlockAudioContext } = makeTestRuntime();
     vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
       imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
@@ -637,36 +633,41 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       />,
     );
 
-    // Default pre-selected mode is Quick look -> uploading via Choose photo runs describe immediately
-    fireEvent.click(screen.getByRole('button', { name: strings.choosePhoto }));
-    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('region', { name: strings.selectedPhotoHeading })).toBeNull();
+    const fullDetail = screen.getByRole('button', { name: strings.fullDetail });
+    const quickLook = screen.getByRole('button', { name: strings.quickLook });
+    expect(quickLook.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(fullDetail);
+    expect(fullDetail.getAttribute('aria-pressed')).toBe('true');
+    expect(fetchMock).not.toHaveBeenCalled();
 
-    const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
+    const choosePhoto = screen.getByRole('button', { name: strings.choosePhoto });
+    fireEvent.click(choosePhoto);
+    expect(unlockAudioContext).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const galleryInput = screen.getByTestId('gallery-input');
     await act(async () => {
       fireEvent.change(galleryInput, {
         target: { files: [new File(['photo1'], 'painting1.jpg', { type: 'image/jpeg' })] },
       });
     });
+    expect(screen.getByText('Full painted details.')).toBeDefined();
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).mode).toBe('detail');
 
-    await waitFor(() => {
-      expect(screen.getByText('Quick painting overview.')).toBeDefined();
-    });
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body)).mode).toBe('describe');
-    expect(spokenTexts).toEqual(['Quick painting overview.']);
+    const otherMode = screen.getByRole('button', { name: strings.quickLookOnPhotoInstead });
+    expect(screen.queryByRole('button', { name: strings.fullDetailOnPhotoInstead })).toBeNull();
+    otherMode.focus();
+    await act(async () => { fireEvent.click(otherMode); });
+    expect(document.activeElement).toBe(otherMode);
+    expect(quickLook.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: strings.backToFullDetailOnPhoto })).toBe(otherMode);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).mode).toBe('describe');
 
-    // Pre-selecting Full detail runs Full detail automatically on the next uploaded photo
-    fireEvent.click(screen.getByRole('radio', { name: strings.modeFullDetailLabel }));
-    await act(async () => {
-      fireEvent.change(galleryInput, {
-        target: { files: [new File(['photo2'], 'painting2.jpg', { type: 'image/jpeg' })] },
-      });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Full painted details.')).toBeDefined();
-    });
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).mode).toBe('detail');
-    expect(spokenTexts).toEqual(['Quick painting overview.', 'Full painted details.']);
+    await act(async () => { fireEvent.click(otherMode); });
+    expect(fullDetail.getAttribute('aria-pressed')).toBe('true');
+    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body)).mode).toBe('detail');
+    expect(spokenTexts).toEqual(['Full painted details.', 'Quick painting overview.', 'Full painted details.']);
     vi.unstubAllGlobals();
   });
 
