@@ -1055,3 +1055,19 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByTestId('kokoro-status').textContent).toBe(`${strings.kokoroCachedStatusLoading} (55%)`);
   });
 });
+
+describe('Something not working? entry', () => {
+  it('is in the header on every screen, opens the guided report, and Cancel goes back', () => {
+    const { coordinator, kokoroClient, piperClient } = makeTestRuntime();
+    render(<App coordinator={coordinator} kokoroClient={kokoroClient} piperClient={piperClient} deviceClassOverride="phone" />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabHistory })[0]);
+    const entry = screen.getByRole('button', { name: strings.reportEntry });
+    fireEvent.click(entry);
+    expect(screen.getByRole('heading', { level: 1, name: strings.reportHeading })).toBeTruthy();
+    expect(entry.getAttribute('aria-current')).toBe('page');
+
+    fireEvent.click(screen.getByRole('button', { name: strings.reportCancel }));
+    expect(screen.getByRole('heading', { name: strings.historyHeading })).toBeTruthy();
+  });
+});

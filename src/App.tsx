@@ -6,6 +6,7 @@ import { CaptureView, type DescriptionResult, type PhotoSelection } from './comp
 import { HistoryView } from './components/HistoryView.tsx';
 import { InfoSettingsView } from './components/InfoSettingsView.tsx';
 import { KokoroBanner } from './components/KokoroBanner.tsx';
+import { ReportView } from './components/ReportView.tsx';
 import {
   applyDescriptionEdit,
   clearHistory,
@@ -17,6 +18,7 @@ import {
   type HistoryEntry,
 } from './historyStore.ts';
 import type { PreparedPhoto } from './imagePrep.ts';
+import { collectDiagnostics } from './reportDiagnostics.ts';
 import {
   detectDeviceClass,
   KOKORO_VOICES,
@@ -48,7 +50,7 @@ import {
   type VoiceProviderId,
 } from './speech/speechCoordinator.ts';
 
-export type ActiveTab = 'camera' | 'history' | 'info';
+export type ActiveTab = 'camera' | 'history' | 'info' | 'report';
 
 export type AppProps = {
   coordinator?: SpeechCoordinator;
@@ -128,6 +130,8 @@ export function App({
   const [online, setOnline] = useState(navigator.onLine);
   const [cacheError, setCacheError] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('camera');
+  const [tabBeforeReport, setTabBeforeReport] = useState<ActiveTab>('camera');
+  const [statusBeforeReport, setStatusBeforeReport] = useState('');
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [deviceVoices, setDeviceVoices] = useState<readonly SpeechSynthesisVoice[]>(
     () => deviceVoicesOverride ?? getBrowserDeviceVoices(),
@@ -841,6 +845,34 @@ export function App({
     setStatusMessage(strings.historyClearedStatus);
   };
 
+  const openReport = () => {
+    if (activeTab === 'report') return;
+    setTabBeforeReport(activeTab);
+    // Remember the last app message from before the report opened; it often names the problem.
+    setStatusBeforeReport(statusMessage);
+    setStatusMessage('');
+    setActiveTab('report');
+  };
+
+  // Only app, browser and feature facts: never photos, descriptions, history or voice names.
+  const getReportDiagnostics = () =>
+    collectDiagnostics({
+      deviceClass,
+      online,
+      offlineReady,
+      updateWaiting: needRefresh,
+      settings,
+      deviceVoiceCount: deviceVoices.length,
+      deviceVoiceMissing: Boolean(settings.deviceVoiceName && deviceVoiceResolution.preferredMissing),
+      activeVoice: activeVoiceId,
+      lastVoiceUsed,
+      speaking: speechStatus.speaking,
+      kokoroState,
+      piperState,
+      descriptionMode: selectedMode,
+      lastStatus: statusBeforeReport,
+    });
+
   const tabs: ReadonlyArray<{ id: ActiveTab; label: string }> = [
     { id: 'camera', label: strings.tabCamera },
     { id: 'history', label: strings.tabHistory },
@@ -862,6 +894,15 @@ export function App({
           </div>
 
           <div aria-hidden="true" className="connection-pill">{online ? strings.online : strings.offline}</div>
+
+          <button
+            type="button"
+            onClick={openReport}
+            aria-current={activeTab === 'report' ? 'page' : undefined}
+            className="surface-button min-h-[48px] rounded-sm border px-4 py-2 text-base font-bold"
+          >
+            {strings.reportEntry}
+          </button>
 
           {/* Desktop & tablet top navigation */}
           <nav aria-label={strings.navLabel} className="hidden gap-2 lg:flex">
@@ -972,6 +1013,14 @@ export function App({
               onDownloadMp3={(entry) => void handleDownloadMp3(entry)}
               onDeleteEntry={(id) => void handleDeleteHistory(id)}
               onClearAll={() => void handleClearHistory()}
+            />
+          )}
+
+          {activeTab === 'report' && (
+            <ReportView
+              online={online}
+              getDiagnostics={getReportDiagnostics}
+              onClose={() => setActiveTab(tabBeforeReport)}
             />
           )}
 
