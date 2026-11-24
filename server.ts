@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createDescribeHandler, type DescribeDeps } from './server/describe.ts';
+import { createReportHandler, MAX_REPORT_BODY, type ReportDeps } from './server/report.ts';
 import { strings } from './shared/strings.ts';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -16,9 +17,11 @@ export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
 export async function createApp({
   production = isProduction(),
   describeDeps,
+  reportDeps,
 }: {
   production?: boolean;
   describeDeps?: DescribeDeps;
+  reportDeps?: ReportDeps;
 } = {}) {
   const app = express();
   app.disable('x-powered-by');
@@ -30,8 +33,12 @@ export async function createApp({
   });
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.post('/api/describe', express.json({ limit: '6mb' }), createDescribeHandler(describeDeps));
+  app.post('/api/report', express.json({ limit: MAX_REPORT_BODY }), createReportHandler(reportDeps));
   // Ensure malformed JSON or oversized bodies on /api return JSON instead of HTML.
-  app.use('/api', (err: { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
+  app.use('/api', (err: { status?: number; type?: string }, req: Request, res: Response, _next: NextFunction) => {
+    if (req.path === '/report') {
+      return res.status(400).json({ error: 'invalid_report', message: strings.errReportInvalid });
+    }
     if (err.type === 'entity.too.large' || err.status === 413) {
       return res.status(413).json({ error: 'image_too_large', message: strings.errImageTooLarge });
     }

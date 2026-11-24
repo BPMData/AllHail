@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import {
@@ -11,6 +12,7 @@ import {
 import { strings } from './shared/strings.ts';
 
 const initialPiperSize = measurePiperDownloadSize(process.cwd());
+const appVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version;
 
 function dedupeSelfHostedOnnxWasm() {
   return {
@@ -41,6 +43,9 @@ function dedupeSelfHostedOnnxWasm() {
 
 export default defineConfig({
   define: {
+    // Shown in problem reports so the team knows which build someone is using.
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_BUILT__: JSON.stringify(new Date().toISOString().slice(0, 10)),
     __PIPER_DOWNLOAD_SIZE_MB__: JSON.stringify(initialPiperSize.sizeMb),
   },
   worker: {
