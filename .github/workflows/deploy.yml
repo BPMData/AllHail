@@ -50,7 +50,8 @@ jobs:
 
       # The Buildpacks launcher runs `npm start` (`node server.ts`) on port 3000.
       # --update-env-vars NODE_ENV=production makes server.ts serve the built app. It adds or
-      # replaces only NODE_ENV, so OPENROUTER_API_KEY and other settings on the service stay as they are.
+      # replaces only NODE_ENV, so OPENROUTER_API_KEY, REPORT_RELAY_URL, REPORT_RELAY_SECRET and other settings on the
+      # service stay as they are.
       # --max-instances 1: the /api/describe rate limit (server/rateLimit.ts) is kept in memory per
       # instance, so more instances would multiply how much of the OpenRouter key one person can use.
       - name: Deploy to Cloud Run

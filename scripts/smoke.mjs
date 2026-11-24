@@ -20,6 +20,14 @@ try {
     assert.equal(response.status, 404);
     assert.match(response.headers.get('content-type'), /application\/json/);
   }
+  // With no relay configured, problem reports answer in JSON so the page can offer the email fallback.
+  const postReport = (body) => fetch(`${base}/api/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  const unconfigured = await postReport(JSON.stringify({ app: 'AllHail', kind: 'problem-report', public: { category: 'other' }, private: {} }));
+  assert.equal(unconfigured.status, 503);
+  assert.equal((await unconfigured.json()).error, 'reports_unavailable');
+  const broken = await postReport('{not json');
+  assert.equal(broken.status, 400);
+  assert.equal((await broken.json()).error, 'invalid_report');
   const home = await get('/');
   assert.equal(home.status, 200);
   assert.equal(home.headers.get('cache-control'), 'no-cache');
