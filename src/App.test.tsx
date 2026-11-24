@@ -1186,6 +1186,68 @@ describe('simple mode for a blind or low-vision student', () => {
   });
 });
 
+describe('the Page layout of the camera screen', () => {
+  function renderPhone() {
+    const runtime = makeTestRuntime();
+    render(
+      <App coordinator={runtime.coordinator} kokoroClient={runtime.kokoroClient} piperClient={runtime.piperClient} deviceClassOverride="phone" />,
+    );
+    return runtime;
+  }
+
+  it('puts Take photo straight after the heading, before the mode choice, and keeps the brand out of the swipe order', () => {
+    renderPhone();
+    const heading = screen.getByRole('heading', { level: 1, name: strings.studentHeading });
+    const shutter = screen.getByRole('button', { name: strings.takePhoto });
+    const quickLook = screen.getByRole('button', { name: strings.quickLook });
+    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(heading, shutter)).toBe(true);
+    expect(follows(shutter, quickLook)).toBe(true);
+    expect(shutter.getAttribute('aria-describedby')).toBe('capture-lead');
+    expect(document.getElementById('capture-lead')?.textContent).toBe(strings.studentLead);
+    expect(screen.getByText(strings.appName).closest('[aria-hidden="true"]')).toBeTruthy();
+  });
+
+  it('reads a description with one playback bar, and one Speed button that steps through the speeds', async () => {
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ text: 'A worksheet titled Unit 4.', model: 'm', mode: 'describe' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    renderPhone();
+
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('camera-input'), {
+        target: { files: [new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })] },
+      });
+    });
+    await waitFor(() => expect(screen.getByText('A worksheet titled Unit 4.')).toBeTruthy());
+
+    const bar = screen.getByRole('group', { name: strings.playbackLabel });
+    expect(bar.querySelectorAll('button')).toHaveLength(3);
+    const speed = screen.getByRole('button', { name: /^Speech speed 1 times/ });
+    expect(speed.textContent).toBe('Speed 1×');
+    fireEvent.click(speed);
+    expect(loadSettings().speechRate).toBe(1.25);
+    expect(screen.getByRole('button', { name: 'Speech speed 1.25 times. Press for 1.5 times.' }).textContent).toBe('Speed 1.25×');
+    fireEvent.click(screen.getByRole('button', { name: /^Speech speed 1.25 times/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Speech speed 1.5 times/ }));
+    // From the fastest it wraps round to the slowest.
+    fireEvent.click(screen.getByRole('button', { name: /^Speech speed 2 times/ }));
+    expect(loadSettings().speechRate).toBe(0.8);
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('Something not working? entry', () => {
   it('is in the header on every screen, opens the guided report, and Cancel goes back', () => {
     const { coordinator, kokoroClient, piperClient } = makeTestRuntime();

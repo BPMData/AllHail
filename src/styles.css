@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/*
+ * AllHail's look: a printed reading page. Flat paper and ink, no shadows, no rounded corners,
+ * thick rules between parts and very large type. Maroon only marks the thing to press.
+ * Accessibility comes first wherever it and the look disagree.
+ */
+
+/* Four text sizes: small, body, large and display. */
+@theme {
+  --text-sm: 0.889rem;
+  --text-base: 1rem;
+  --text-lg: 1rem;
+  --text-xl: 1.333rem;
+  --text-2xl: 1.333rem;
+  --text-3xl: 1.889rem;
+  --text-4xl: 1.889rem;
+}
+
 @font-face {
   font-family: "Atkinson Hyperlegible";
   src: url('/fonts/AtkinsonHyperlegible-Regular.ttf') format('truetype');
@@ -12,67 +29,143 @@
   font-weight: 700;
   font-display: swap;
 }
+
 :root {
+  --paper: #ffffff;
+  --ink: #121419;
+  --muted: #4b5160;
+  --hair: #c4c8d0;
+  --wash: #f1f2f5;
+  --press: #6e1d20;
+  --press-hover: #561417;
+  --on-press: #ffffff;
+  --danger: #a31919;
+  --focus: #9a4000;
+  --rule: 3px;
+  /* Height of the phone tab bar, so the playback bar can sit just above it. */
+  --tabbar-h: 61px;
+
   font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
-  color: #18181b;
-  background: #f1f5f9;
+  color: var(--ink);
+  background: var(--paper);
   font-size: 18px;
-  line-height: 1.65;
+  line-height: 1.6;
   color-scheme: light dark;
 }
-body { min-width: 280px; margin: 0; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1014;
+    --ink: #f2f3f5;
+    --muted: #b4bac6;
+    --hair: #3a404c;
+    --wash: #1a1d24;
+    --press: #e8a1a5;
+    --press-hover: #f2c0c3;
+    --on-press: #121419;
+    --focus: #ffd089;
+  }
+}
+/* More contrast when the phone asks for it. */
+@media (prefers-contrast: more) {
+  :root { --hair: var(--ink); --muted: var(--ink); --rule: 4px; }
+}
+/* On iPhone and iPad, follow the phone's own text size setting. */
+@supports (font: -apple-system-body) and (-webkit-touch-callout: none) {
+  :root { font: -apple-system-body; font-family: "Atkinson Hyperlegible", system-ui, sans-serif; line-height: 1.6; }
+}
+
+body { min-width: 280px; margin: 0; background: var(--paper); }
+*, ::before, ::after { border-color: var(--hair); }
 button, summary, select { min-height: 48px; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-.photo-shutter { min-height: 76px; }
-/* Simple mode's one huge button: a big target for low vision and motor difficulties. */
-.simple-shutter { min-height: max(40vh, 180px); }
-:focus-visible, .segmented label:focus-within { outline: 4px solid #9a4000; outline-offset: 3px; position: relative; z-index: 1; }
-.panel-card, .status-panel { background: #fff; border: 1px solid #b6c2d2; }
-.app-header { background: linear-gradient(180deg, #fff 0%, #eef3fa 100%); border-color: #cbd5e1; box-shadow: inset 0 1px 0 #fff; }
-.panel-header { background: linear-gradient(180deg, #fcfdff 0%, #eaeff7 100%); border-bottom: 1px solid #b6c2d2; box-shadow: inset 0 1px 0 #fff; padding: 1rem 1.25rem; }
-.panel-body { padding: 1.25rem; }
-.reader-surface { background: #f8fafc; border-color: #94a3b8; color: #18181b; }
-.primary-cta, .nav-tab-active, .update-button {
-  color: #fff;
-  background: linear-gradient(180deg, #8e2c30 0%, #6e1d20 49%, #561417 50%, #732023 100%);
-  border: 1px solid #450f11;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
+:where(button, select, input, textarea, summary, img, video, progress, .panel-card, .status-panel, .reader-surface) { border-radius: 0; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--press); }
+:focus-visible, .segmented label:focus-within { outline: 4px solid var(--focus); outline-offset: 3px; position: relative; z-index: 1; }
+
+/* Page structure: rules, not boxes. */
+.app-header { background: transparent; border-width: 0 0 var(--rule); border-color: var(--ink); padding-inline: 0; }
+.panel-card { background: transparent; border-width: var(--rule) 0 0; border-color: var(--ink); padding-inline: 0; }
+.capture-panel { border-top-width: 0; }
+.panel-card .panel-card { border-top-width: 1px; border-color: var(--hair); }
+.panel-header { background: transparent; border: 0; padding: 1rem 0 .5rem; }
+.panel-body { padding: .5rem 0 1.25rem; }
+.page-rule { border-bottom: var(--rule) solid var(--ink); padding-bottom: .5rem; }
+.status-panel { background: var(--wash); border: 0; border-left: 6px solid var(--ink); }
+
+/* Reading text, and the boxes people type into. */
+.reader-surface { background: var(--paper); color: var(--ink); border-color: var(--hair); }
+button.reader-surface { border-width: 0 0 0 var(--rule); padding-block: .25rem; }
+textarea.reader-surface, input.reader-surface { border: 2px solid var(--ink); }
+
+/* The thing to press. */
+.primary-cta, .update-button {
+  color: var(--on-press);
+  background: var(--press);
+  border: 2px solid var(--press);
+  box-shadow: none;
 }
+.primary-cta:hover:not(:disabled), .update-button:hover:not(:disabled) { background: var(--press-hover); border-color: var(--press-hover); }
 .surface-button, .secondary-cta {
-  color: #0f172a;
-  background: linear-gradient(180deg, #fff 0%, #f3f6fb 49%, #e6ecf5 50%, #eef3f9 100%);
-  border: 1px solid #b6c2d2;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: none;
 }
-.surface-button:hover:not(:disabled), .secondary-cta:hover:not(:disabled) { background: linear-gradient(180deg, #fff 0%, #eef4fc 49%, #dce6f4 50%, #e7effa 100%); border-color: #8fa3bd; }
-.primary-cta:hover:not(:disabled), .nav-tab-active:hover:not(:disabled), .update-button:hover:not(:disabled) { background: linear-gradient(180deg, #a2363a 0%, #7f2428 49%, #64191d 50%, #83292c 100%); }
-.secondary-toolbar button { padding-inline: .85rem; }
+.surface-button:hover:not(:disabled), .secondary-cta:hover:not(:disabled) { background: var(--wash); }
+.danger-button { color: #fff; background: var(--danger); border: 2px solid var(--danger); }
+
+/* Big slabs: the camera's Take photo, and simple mode's even bigger one. */
+.photo-shutter, .simple-shutter { display: flex; align-items: flex-end; justify-content: flex-start; text-align: left; line-height: 1.1; }
+.photo-shutter { min-height: clamp(140px, 26vh, 220px); }
+.simple-shutter { min-height: max(50vh, 220px); font-size: 2.5rem; padding-block: 1.25rem; }
+
+/* Two or more choices joined into one bar. The chosen one is filled with ink. */
 .segmented { width: fit-content; max-width: 100%; }
-.segmented > * { border-radius: 0; margin-right: -1px; }
-.segmented > :first-child { border-radius: 3px 0 0 3px; }
-.segmented > :last-child { border-radius: 0 3px 3px 0; margin-right: 0; }
-.connection-pill, .saved-badge { color: #172554; background: #e7edf4; border: 1px solid #9aaec3; border-radius: 3px; padding: .15rem .6rem; font-size: .85rem; font-weight: 700; }
-.danger-button { color: #fff; background: #a31919; border-color: #7f1d1d; }
-.nav-bar { background: #f8fafc; border-color: #b6c2d2; }
-.nav-tab-idle:not(.surface-button) { color: #172554; background: transparent; }
-progress.kokoro-progress { appearance: none; height: 12px; min-height: 12px; border: 1px solid #64748b; border-radius: 3px; background: #e7edf4; overflow: hidden; }
-progress.kokoro-progress::-webkit-progress-bar { background: #e7edf4; }
-progress.kokoro-progress::-webkit-progress-value { background: #6e1d20; }
-progress.kokoro-progress::-moz-progress-bar { background: #6e1d20; }
-.skip-link { position: fixed; top: 12px; left: 12px; padding: 12px; background: #fff; color: #18181b; z-index: 50; transform: translateY(-200%); }
+.segmented > * { margin-right: -2px; }
+.segmented > :last-child { margin-right: 0; }
+.seg-option { color: var(--ink); background: var(--paper); border: 2px solid var(--ink); }
+.seg-option[aria-pressed="true"] { color: var(--paper); background: var(--ink); }
+.seg-option:hover:not([aria-pressed="true"]) { background: var(--wash); }
+
+/* Less used actions: plain rows with a chevron. */
+.row-link { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; padding: .5rem 0; text-align: left; font-weight: 700; color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--hair); }
+.row-link::after { content: "›"; color: var(--muted); font-size: 1.4em; line-height: 1; }
+.row-link:hover:not([aria-disabled="true"]) { background: var(--wash); }
+
+/* Playback bar: stays in thumb reach above the tab bar while you read on a phone. */
+.transport { display: grid; grid-template-columns: 1.4fr 1fr 1fr; border-top: var(--rule) solid var(--ink); background: var(--paper); position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); z-index: 30; }
+.transport > button { min-height: 60px; padding: .5rem; font-weight: 700; border: 0; border-left: 1px solid var(--hair); background: var(--paper); color: var(--ink); }
+.transport > button:first-child { border-left: 0; }
+.transport > .primary-cta { background: var(--press); color: var(--on-press); }
+@media (min-width: 1024px) { .transport { position: static; } }
+.secondary-toolbar { background: var(--wash); padding: .25rem .5rem; }
+.secondary-toolbar > button { border: 0; background: transparent; color: var(--ink); }
+.secondary-toolbar > button:hover:not(:disabled) { background: var(--paper); }
+.secondary-toolbar > .danger-button { background: var(--danger); color: #fff; }
+
+.connection-pill, .saved-badge { color: var(--muted); background: transparent; border: 0; padding: .15rem 0; font-size: .889rem; font-weight: 700; }
+
+/* Tabs: ink text, and a maroon bar on the one you're on. */
+.nav-bar { background: var(--paper); border-color: var(--hair); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.nav-tab-idle { color: var(--muted); background: transparent; }
+.app-header .nav-tab-idle.surface-button { border-color: transparent; }
+.nav-tab-active { color: var(--ink); background: transparent; border: 2px solid transparent; box-shadow: inset 0 4px 0 var(--press); }
+.app-header .nav-tab-active { box-shadow: inset 0 -4px 0 var(--press); }
+
+progress.kokoro-progress { appearance: none; height: 12px; min-height: 12px; border: 2px solid var(--ink); background: var(--paper); overflow: hidden; }
+progress.kokoro-progress::-webkit-progress-bar { background: var(--paper); }
+progress.kokoro-progress::-webkit-progress-value { background: var(--press); }
+progress.kokoro-progress::-moz-progress-bar { background: var(--press); }
+
+.skip-link { position: fixed; top: 12px; left: 12px; padding: 12px; background: var(--paper); color: var(--ink); border: 2px solid var(--ink); z-index: 50; transform: translateY(-200%); }
 .skip-link:focus { transform: translateY(0); }
-@media (prefers-color-scheme: dark) {
-  :root { color: #f8fafc; background: #090d16; }
-  :focus-visible, .segmented label:focus-within { outline-color: #ffd089; }
-  .panel-card, .status-panel { background: #111827; border-color: #64748b; }
-  .app-header { background: linear-gradient(180deg, #192438 0%, #0f1624 100%); border-color: #64748b; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
-  .panel-header { background: linear-gradient(180deg, #1e2a42 0%, #131c2e 100%); border-color: #64748b; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
-  .reader-surface { background: #090d16; border-color: #94a3b8; color: #f8fafc; }
-  .surface-button, .secondary-cta { color: #f8fafc; background: linear-gradient(180deg, #37465b 0%, #29384c 49%, #1e293b 50%, #29384c 100%); border-color: #94a3b8; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
-  .surface-button:hover:not(:disabled), .secondary-cta:hover:not(:disabled) { background: linear-gradient(180deg, #394b65 0%, #2b3a52 49%, #202d40 50%, #2b3a52 100%); border-color: #cbd5e1; }
-  .connection-pill, .saved-badge { color: #f8fafc; background: #253247; border-color: #94a3b8; }
-  .nav-bar { background: #111827; border-color: #64748b; }
-  .nav-tab-idle:not(.surface-button) { color: #f8fafc; }
-  .skip-link { background: #fff; color: #18181b; }
+
+/* Windows high contrast and other forced colours: keep every edge and the chosen state visible. */
+@media (forced-colors: active) {
+  .primary-cta, .update-button, .surface-button, .seg-option, .transport > button { border: 2px solid ButtonText; }
+  .seg-option[aria-pressed="true"], .nav-tab-active { outline: 3px solid Highlight; outline-offset: -3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

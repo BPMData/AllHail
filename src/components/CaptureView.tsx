@@ -53,6 +53,17 @@ type CaptureViewProps = {
   onRateChange: (rate: number) => void;
 };
 
+/** Shows a speech rate the way people say it: 1×, 1.25×. */
+function formatRate(rate: number): string {
+  return String(rate);
+}
+
+/** One press steps to the next speed, and wraps from the fastest back to the slowest. */
+function nextSpeechRate(current: number): number {
+  const index = SPEECH_RATES.findIndex((rate) => Math.abs(rate - current) < 0.01);
+  return SPEECH_RATES[(index + 1) % SPEECH_RATES.length];
+}
+
 export function CaptureView({
   online,
   busy,
@@ -87,6 +98,8 @@ export function CaptureView({
   const streamRef = useRef<MediaStream | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
+  const currentRate = SPEECH_RATES.find((rate) => Math.abs(rate - settings.speechRate) < 0.01) ?? settings.speechRate;
+  const nextRate = nextSpeechRate(settings.speechRate);
   const [viewfinderOpen, setViewfinderOpen] = useState(false);
   const [viewfinderReady, setViewfinderReady] = useState(false);
   const [viewfinderMessage, setViewfinderMessage] = useState<string | null>(null);
@@ -364,13 +377,23 @@ export function CaptureView({
           <h1 id="capture-heading" className="text-3xl font-bold leading-tight sm:text-4xl">
             {strings.studentHeading}
           </h1>
-          <p className="mt-2 text-base opacity-90">{strings.studentLead}</p>
+          <p id="capture-lead" hidden>{strings.studentLead}</p>
         </div>
 
         <div className="panel-body space-y-5">
+          <button
+            type="button"
+            aria-disabled={photoBusy}
+            aria-describedby="capture-lead"
+            onClick={() => void handlePrimaryShutter()}
+            className="primary-cta photo-shutter w-full px-5 py-4 text-3xl font-bold aria-disabled:opacity-60"
+          >
+            {strings.takePhoto}
+          </button>
+
           <div role="group" aria-labelledby="description-mode-label">
-            <p id="description-mode-label" className="mb-2 text-base font-bold">{strings.descriptionMode}</p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <p id="description-mode-label" className="mb-2 text-sm font-bold">{strings.descriptionMode}</p>
+            <div className="segmented grid w-full grid-cols-2">
               {([
                 { mode: 'describe', label: strings.quickLook, hint: strings.quickLookHint },
                 { mode: 'detail', label: strings.fullDetail, hint: strings.fullDetailHint },
@@ -383,7 +406,7 @@ export function CaptureView({
                   aria-labelledby={`description-mode-name-${mode}`}
                   aria-describedby={`description-mode-hint-${mode}`}
                   onClick={() => { if (!photoBusy) onModeChange(mode); }}
-                  className={`${selectedMode === mode ? 'nav-tab-active' : 'surface-button'} min-h-[48px] rounded-sm px-3 py-2 text-left`}
+                  className="seg-option min-h-[56px] px-3 py-2 text-left"
                 >
                   <span id={`description-mode-name-${mode}`} className="block font-bold">{label}</span>
                   <span id={`description-mode-hint-${mode}`} className="block text-sm">{hint}</span>
@@ -392,21 +415,12 @@ export function CaptureView({
             </div>
           </div>
 
-          <button
-            type="button"
-            aria-disabled={photoBusy}
-            onClick={() => void handlePrimaryShutter()}
-            className="primary-cta photo-shutter w-full rounded-sm px-6 py-4 text-xl font-bold aria-disabled:opacity-60"
-          >
-            {strings.takePhoto}
-          </button>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid border-t">
             <button
               type="button"
               aria-disabled={photoBusy}
               onClick={handleChoosePhotoClick}
-              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm px-4 py-3 text-base font-bold aria-disabled:opacity-60"
+              className="row-link aria-disabled:opacity-60"
             >
               {strings.choosePhoto}
             </button>
@@ -415,7 +429,7 @@ export function CaptureView({
               type="button"
               aria-expanded={viewfinderOpen}
               onClick={() => void toggleViewfinder()}
-              className="surface-button flex min-h-[52px] items-center justify-center rounded-sm border px-4 py-3 text-base font-bold"
+              className="row-link"
             >
               {viewfinderOpen ? strings.liveViewfinderHide : strings.liveViewfinderShow}
             </button>
@@ -561,14 +575,10 @@ export function CaptureView({
                     {strings.describedWith} {currentResult.model}
                   </p>
 
-                  {/* Explicit playback, copy, MP3, and optional edit controls */}
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  {/* Playback bar: the main control, Repeat and speed. It stays in thumb reach while reading on a phone. */}
+                  <div className="transport mt-4" role="group" aria-label={strings.playbackLabel}>
                     {speechStatus.speaking ? (
-                      <button
-                        type="button"
-                        onClick={onTogglePause}
-                        className="primary-cta min-h-[52px] flex-1 rounded-sm px-5 py-3 text-base font-bold"
-                      >
+                      <button type="button" onClick={onTogglePause} className="primary-cta">
                         {speechStatus.paused ? strings.resumeSpeech : strings.pauseSpeech}
                       </button>
                     ) : (
@@ -578,7 +588,7 @@ export function CaptureView({
                           onUnlockPlayback();
                           onPlayResult(currentResult.text);
                         }}
-                        className="primary-cta min-h-[52px] flex-1 rounded-sm px-5 py-3 text-base font-bold"
+                        className="primary-cta"
                       >
                         {strings.playAloud}
                       </button>
@@ -590,28 +600,36 @@ export function CaptureView({
                         onUnlockPlayback();
                         onRepeat();
                       }}
-                      className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
                     >
                       {strings.repeatSpeech}
                     </button>
 
+                    <button
+                      type="button"
+                      aria-label={strings.speedStepLabel
+                        .replace('{rate}', formatRate(currentRate))
+                        .replace('{next}', formatRate(nextRate))}
+                      onClick={() => onRateChange(nextRate)}
+                    >
+                      {strings.speedStep.replace('{rate}', formatRate(currentRate))}
+                    </button>
+                  </div>
+                  <div className="secondary-toolbar flex flex-wrap gap-1">
                     {speechStatus.speaking && (
                       <button
                         type="button"
                         onClick={onStopSpeech}
-                        className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
                       >
                         {strings.stopSpeech}
                       </button>
                     )}
 
-                  </div>
-                  <div className="secondary-toolbar mt-3 flex flex-wrap gap-2">
                     {onCopyText && (
                       <button
                         type="button"
                         onClick={() => onCopyText(currentResult.text)}
-                        className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
                       >
                         {strings.copyText}
                       </button>
@@ -624,7 +642,7 @@ export function CaptureView({
                         aria-busy={mp3Busy}
                         data-testid="download-mp3-button"
                         onClick={() => onDownloadMp3(currentResult)}
-                        className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold disabled:opacity-60"
+                        className="min-h-[48px] px-4 py-2 text-sm font-bold disabled:opacity-60"
                       >
                         {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
                       </button>
@@ -634,7 +652,7 @@ export function CaptureView({
                       <button
                         type="button"
                         onClick={handleStartEdit}
-                        className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
                       >
                         {strings.editDescription}
                       </button>
@@ -646,8 +664,8 @@ export function CaptureView({
                         onClick={() => void handleResetOriginalClick(false)}
                         className={
                           confirmReset
-                            ? 'danger-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
-                            : 'surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
+                            ? 'danger-button min-h-[48px] px-4 py-2 text-sm font-bold'
+                            : 'min-h-[48px] px-4 py-2 text-sm font-bold'
                         }
                       >
                         {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
@@ -659,7 +677,7 @@ export function CaptureView({
                         <button
                           type="button"
                           onClick={() => void handleBringBackEditsClick(false)}
-                          className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                          className="min-h-[48px] px-4 py-2 text-sm font-bold"
                         >
                           {strings.bringBackEdits}
                         </button>
@@ -673,32 +691,6 @@ export function CaptureView({
             <p className="mt-4 text-lg opacity-80">{strings.readerEmpty}</p>
           )}
 
-          {/* Speed selector */}
-          <div className="mt-5 border-t pt-4">
-            <p id="student-speech-rate-label" className="block text-base font-bold">
-              {strings.speedLabel}
-            </p>
-            <div className="segmented mt-2 flex flex-wrap" role="group" aria-labelledby="student-speech-rate-label">
-              {SPEECH_RATES.map((rate) => {
-                const selected = Math.abs(settings.speechRate - rate) < 0.01;
-                return (
-                  <button
-                    key={rate}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => onRateChange(rate)}
-                    className={
-                      selected
-                        ? 'primary-cta min-h-[48px] min-w-[60px] rounded-sm px-3 py-2 text-base font-bold'
-                        : 'surface-button min-h-[48px] min-w-[60px] rounded-sm border px-3 py-2 text-base font-bold'
-                    }
-                  >
-                    {rate}×
-                  </button>
-                );
-              })}
-            </div>
-          </div>
           </div>
         </div>
       </section>

@@ -927,13 +927,11 @@ export function App({
       <a className="skip-link" href="#main">{strings.skipLink}</a>
 
       <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-8 lg:pb-12 lg:pt-8">
-        <header className="app-header mb-4 flex flex-wrap items-center justify-between gap-4 border px-4 py-3">
-          <div className="flex items-center gap-3">
-            <img src="/icons/icon.svg" alt="" width="48" height="48" className="shrink-0 rounded-sm" />
-            <div>
-              <p className="text-2xl font-bold tracking-tight">{strings.appName}</p>
-              <p className="text-sm opacity-85">{strings.suite}</p>
-            </div>
+        <header className="app-header mb-4 flex flex-wrap items-center justify-between gap-4 border py-3">
+          {/* The page title already says AllHail, so the brand is for the eye only and costs no swipe. */}
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <img src="/icons/icon.svg" alt="" width="40" height="40" className="shrink-0" />
+            <p className="text-xl font-bold tracking-tight">{strings.appName}</p>
           </div>
 
           <div aria-hidden="true" className="connection-pill">{online ? strings.online : strings.offline}</div>
@@ -1099,7 +1097,7 @@ export function App({
       {/* Mobile bottom tab bar in natural thumb zone */}
       <nav
         aria-label={strings.navLabel}
-        className="nav-bar fixed bottom-0 left-0 right-0 z-40 grid grid-cols-3 border-t backdrop-blur-md lg:hidden"
+        className="nav-bar fixed bottom-0 left-0 right-0 z-40 grid grid-cols-3 border-t lg:hidden"
       >
         {tabs.map((tab) => (
           <button
