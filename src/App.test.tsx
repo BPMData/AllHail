@@ -1056,6 +1056,136 @@ describe('app accessibility, PWA feedback, and student mode', () => {
   });
 });
 
+describe('simple mode for a blind or low-vision student', () => {
+  function renderApp(runtime = makeTestRuntime()) {
+    const view = render(
+      <App coordinator={runtime.coordinator} kokoroClient={runtime.kokoroClient} piperClient={runtime.piperClient} deviceClassOverride="phone" />,
+    );
+    return { ...runtime, ...view };
+  }
+
+  function startFromSettings({ pin = '', pinAgain = pin, detail = false }: { pin?: string; pinAgain?: string; detail?: boolean } = {}) {
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    if (detail) fireEvent.click(screen.getByRole('radio', { name: new RegExp(strings.fullDetail) }));
+    if (pin) {
+      fireEvent.change(screen.getByLabelText(strings.setupPinLabel), { target: { value: pin } });
+      fireEvent.change(screen.getByLabelText(strings.setupPinConfirmLabel), { target: { value: pinAgain } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: strings.setupStart }));
+  }
+
+  it('is set up once in Settings, then shows only a few very large controls and survives a restart', () => {
+    const first = renderApp();
+    startFromSettings({ pin: '2468', detail: true });
+
+    expect(screen.getByRole('heading', { level: 1, name: strings.simpleModeTitle })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole('main'));
+    // Nothing else to swipe through: Take photo and Teacher settings only, until there's a description.
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([strings.simpleTakePhoto, strings.simpleSettings]);
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain(strings.setupStarted);
+    expect(loadSettings()).toMatchObject({ simpleMode: true, simpleModeDescription: 'detail', lockPin: '2468' });
+
+    // Closing and reopening the app (or an update) keeps it locked.
+    first.unmount();
+    renderApp();
+    expect(screen.getByRole('heading', { level: 1, name: strings.simpleModeTitle })).toBeTruthy();
+  });
+
+  it('refuses a PIN that is too short or typed differently twice', () => {
+    renderApp();
+    startFromSettings({ pin: '12' });
+    expect(screen.getByRole('alert').textContent).toBe(strings.setupPinInvalid);
+    fireEvent.change(screen.getByLabelText(strings.setupPinLabel), { target: { value: '1234' } });
+    fireEvent.change(screen.getByLabelText(strings.setupPinConfirmLabel), { target: { value: '4321' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.setupStart }));
+    expect(screen.getByRole('alert').textContent).toBe(strings.setupPinMismatch);
+    expect(loadSettings().simpleMode).toBe(false);
+  });
+
+  it('needs the PIN to leave, and says so clearly when it is wrong', () => {
+    renderApp();
+    startFromSettings({ pin: '2468' });
+
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleSettings }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: strings.simpleUnlockHeading }));
+    fireEvent.change(screen.getByLabelText(strings.simpleUnlockPinLabel), { target: { value: '1111' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleUnlockWithPin }));
+    expect(screen.getByRole('alert').textContent).toBe(strings.simpleWrongPin);
+    expect(loadSettings().simpleMode).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleUnlockCancel }));
+    expect(screen.getByRole('button', { name: strings.simpleTakePhoto })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleSettings }));
+    fireEvent.change(screen.getByLabelText(strings.simpleUnlockPinLabel), { target: { value: '2468' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleUnlockWithPin }));
+    expect(loadSettings().simpleMode).toBe(false);
+    expect(screen.getByRole('heading', { name: strings.settingsHeading })).toBeTruthy();
+    expect(screen.getByText(strings.simpleModeOff)).toBeTruthy();
+  });
+
+  it('without a PIN, leaving takes two deliberate presses', () => {
+    renderApp();
+    startFromSettings();
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleSettings }));
+    expect(loadSettings().simpleMode).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleUnlockConfirm }));
+    expect(loadSettings().simpleMode).toBe(false);
+  });
+
+  it('takes a photo with the chosen description, reads it aloud, and offers Repeat and Pause', async () => {
+    vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
+      imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
+      width: 800,
+      height: 600,
+      byteLength: 128,
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ text: 'A red mug on a desk.', model: 'm', mode: 'detail' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+
+    const { spokenTexts } = renderApp();
+    startFromSettings({ detail: true });
+
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleTakePhoto }));
+    expect(vibrate).toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('simple-camera-input'), {
+        target: { files: [new File(['photo'], 'photo.jpg', { type: 'image/jpeg' })] },
+      });
+    });
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: strings.readerHeading })).toBeTruthy());
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).mode).toBe('detail');
+    expect(screen.getByText('A red mug on a desk.')).toBeTruthy();
+    const status = screen.getByRole('status');
+    expect(status.textContent).toContain(strings.statusReady);
+    expect(status.textContent).not.toContain('red mug');
+    expect(spokenTexts).toEqual(['A red mug on a desk.']);
+
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleRepeat }));
+    expect(spokenTexts).toHaveLength(2);
+    expect(screen.getByRole('button', { name: strings.simplePause })).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it('says plainly when it is offline instead of opening the camera', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderApp();
+    startFromSettings();
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleTakePhoto }));
+    expect(screen.getByRole('status').textContent).toBe(strings.statusOfflineCannotDescribe);
+  });
+});
+
 describe('Something not working? entry', () => {
   it('is in the header on every screen, opens the guided report, and Cancel goes back', () => {
     const { coordinator, kokoroClient, piperClient } = makeTestRuntime();

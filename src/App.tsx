@@ -6,6 +6,8 @@ import { CaptureView, type DescriptionResult, type PhotoSelection } from './comp
 import { HistoryView } from './components/HistoryView.tsx';
 import { InfoSettingsView } from './components/InfoSettingsView.tsx';
 import { KokoroBanner } from './components/KokoroBanner.tsx';
+import { SimpleModeSetup } from './components/SimpleModeSetup.tsx';
+import { SimpleModeView } from './components/SimpleModeView.tsx';
 import { ReportView } from './components/ReportView.tsx';
 import {
   applyDescriptionEdit,
@@ -873,6 +875,47 @@ export function App({
       lastStatus: statusBeforeReport,
     });
 
+  const startSimpleMode = (patch: Pick<AppSettings, 'simpleMode' | 'simpleModeDescription' | 'lockPin'>) => {
+    updateSettings(patch, strings.setupStarted);
+    setStatusMessage(strings.setupStarted);
+  };
+
+  const leaveSimpleMode = () => {
+    updateSettings({ simpleMode: false }, strings.simpleModeOff);
+    setActiveTab('info');
+    setStatusMessage(strings.simpleModeOff);
+  };
+
+  // Moving into or out of simple mode replaces the whole screen, so put screen-reader focus at its start.
+  const simpleModeShown = useRef(settings.simpleMode);
+  useEffect(() => {
+    if (simpleModeShown.current === settings.simpleMode) return;
+    simpleModeShown.current = settings.simpleMode;
+    document.getElementById('main')?.focus();
+  }, [settings.simpleMode]);
+
+  if (settings.simpleMode) {
+    return (
+      <SimpleModeView
+        online={online}
+        busy={busy}
+        mode={settings.simpleModeDescription}
+        statusMessage={statusMessage}
+        descriptionText={currentResult?.text ?? null}
+        speechStatus={speechStatus}
+        lockPin={settings.lockPin}
+        needRefresh={needRefresh}
+        onUnlockCapture={handleUnlockCapture}
+        onDescribePrepared={handleNewPhoto}
+        onStatusAnnouncement={setStatusMessage}
+        onRepeat={handleRepeat}
+        onTogglePause={handleTogglePause}
+        onLeaveSimpleMode={leaveSimpleMode}
+        onUpdateApp={() => void handleUpdate()}
+      />
+    );
+  }
+
   const tabs: ReadonlyArray<{ id: ActiveTab; label: string }> = [
     { id: 'camera', label: strings.tabCamera },
     { id: 'history', label: strings.tabHistory },
@@ -1049,6 +1092,7 @@ export function App({
               onUpdateApp={() => void handleUpdate()}
             />
           )}
+          {activeTab === 'info' && <SimpleModeSetup settings={settings} onStart={startSimpleMode} />}
         </main>
       </div>
 
