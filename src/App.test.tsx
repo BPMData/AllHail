@@ -1125,6 +1125,21 @@ describe('simple mode for a blind or low-vision student', () => {
     expect(screen.getByText(strings.simpleModeOff)).toBeTruthy();
   });
 
+  it('never uses a password box for the PIN, so the browser offers no save-password prompt', () => {
+    renderApp();
+    fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
+    fireEvent.change(screen.getByLabelText(strings.setupPinLabel), { target: { value: '2468' } });
+    expect((screen.getByLabelText(strings.setupPinLabel) as HTMLInputElement).value).toBe('••••');
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    fireEvent.change(screen.getByLabelText(strings.setupPinConfirmLabel), { target: { value: '2468' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.setupStart }));
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleSettings }));
+    expect(document.querySelector('input[type="password"]')).toBeNull();
+    fireEvent.change(screen.getByLabelText(strings.simpleUnlockPinLabel), { target: { value: '2468' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.simpleUnlockWithPin }));
+    expect(loadSettings().simpleMode).toBe(false);
+  });
+
   it('without a PIN, leaving takes two deliberate presses', () => {
     renderApp();
     startFromSettings();

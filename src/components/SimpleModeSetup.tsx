@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { PromptMode } from '../../shared/prompts.ts';
 import { strings } from '../../shared/strings.ts';
 import { PIN_RE, type AppSettings } from '../settings.ts';
+import { MaskedPinInput } from './MaskedPinInput.tsx';
 
 /** Where a teacher, aide or the student sets up simple mode, then locks it. Voice and speed come from the settings above it. */
 type SimpleModeSetupProps = {
@@ -65,30 +66,17 @@ export function SimpleModeSetup({ settings, onStart }: SimpleModeSetupProps) {
       <div className="mt-5">
         <label htmlFor={`${ids}-pin`} className="block text-lg font-bold">{strings.setupPinLabel}</label>
         <p id={`${ids}-pin-hint`} className="text-base opacity-85">{strings.setupPinHint}</p>
-        <input
+        <MaskedPinInput
           id={`${ids}-pin`}
-          type="password"
-          inputMode="numeric"
-          autoComplete="new-password"
-          maxLength={8}
           value={pin}
           aria-describedby={`${ids}-pin-hint`}
-          onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+          onChange={setPin}
           className={field}
         />
         {pin && (
           <>
             <label htmlFor={`${ids}-pin-again`} className="mt-4 block text-lg font-bold">{strings.setupPinConfirmLabel}</label>
-            <input
-              id={`${ids}-pin-again`}
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={8}
-              value={pinAgain}
-              onChange={(event) => setPinAgain(event.target.value.replace(/\D/g, ''))}
-              className={field}
-            />
+            <MaskedPinInput id={`${ids}-pin-again`} value={pinAgain} onChange={setPinAgain} className={field} />
           </>
         )}
       </div>
