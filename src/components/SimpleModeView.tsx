@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { PromptMode } from '../../shared/prompts.ts';
 import { strings } from '../../shared/strings.ts';
 import { preparePhotoBlob, type PreparedPhoto } from '../imagePrep.ts';
+import { MaskedPinInput } from './MaskedPinInput.tsx';
 import type { SpeechStatusSnapshot } from '../speech/speechCoordinator.ts';
 
 /**
@@ -134,6 +135,7 @@ export function SimpleModeView({
           {lockPin ? (
             <form
               className="mt-4"
+              autoComplete="off"
               onSubmit={(event) => {
                 event.preventDefault();
                 tryUnlock();
@@ -141,16 +143,12 @@ export function SimpleModeView({
             >
               <label htmlFor={`${ids}-pin`} className="block text-xl font-bold">{strings.simpleUnlockPinLabel}</label>
               {wrongPin && <p role="alert" className="mt-2 text-xl font-bold">{strings.simpleWrongPin}</p>}
-              <input
+              <MaskedPinInput
                 id={`${ids}-pin`}
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={8}
                 value={pin}
                 aria-invalid={wrongPin || undefined}
-                onChange={(event) => {
-                  setPin(event.target.value.replace(/\D/g, ''));
+                onChange={(digits) => {
+                  setPin(digits);
                   setWrongPin(false);
                 }}
                 className="reader-surface mt-3 min-h-[64px] w-full rounded-sm border px-4 text-2xl tracking-widest"
