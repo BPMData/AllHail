@@ -90,11 +90,16 @@ On iPhone or iPad, use Safari's Share menu and **Add to Home Screen**. Installin
 
 The service worker precaches the built app files, including local icons and styles. Piper's runtime files (`/ort/`, `/piper/`) are cached the first time they're used. Kokoro's model is stored by the browser when it downloads. API routes are excluded from offline navigation, and photos and API results are never cached. New versions offer an **Update AllHail** button, so a reload doesn't interrupt your work.
 
+## Simple mode for a student
+
+For a student who is blind or has low vision, a teacher or aide can turn on simple mode at the bottom of Settings & Info. It shows one very large Take photo button, the description, Repeat and Pause, and nothing else to swipe through. It stays on after the app is closed or updated. Leaving it takes the PIN set up with it, or two deliberate presses if no PIN was set. For a full lock, also use Guided Access on iPhone or screen pinning on Android.
+
 ## Where things live
 
 - `src/`: React app and styles (React 19, Tailwind 4).
 - `src/components/CaptureView.tsx`: student camera mode.
 - `src/components/HistoryView.tsx`: description history.
+- `src/components/SimpleModeView.tsx` and `SimpleModeSetup.tsx`: simple mode and where it is set up and locked.
 - `src/components/InfoSettingsView.tsx`: settings (voice order, Kokoro and Piper downloads), install help, privacy and credits.
 - `src/imagePrep.ts`: turning each photo upright, shrinking it and stripping its metadata before upload.
 - `src/historyStore.ts`: IndexedDB history.

@@ -1,3 +1,5 @@
+import type { PromptMode } from '../shared/prompts.ts';
+
 export type DeviceClass = 'phone' | 'laptop';
 export type VoiceOrderPreference = 'auto' | 'device-first' | 'kokoro-first' | 'piper-first';
 
@@ -10,6 +12,11 @@ export type AppSettings = {
   piperEnabledOnPhone: boolean;
   kokoroVoiceId: string;
   disableEditing: boolean;
+  /** Simple mode: one huge Take photo button, everything else locked away until a deliberate unlock. */
+  simpleMode: boolean;
+  simpleModeDescription: PromptMode;
+  /** Optional 4 to 8 digit PIN to leave simple mode. A child lock against accidents, not security. */
+  lockPin: string;
 };
 
 export const KOKORO_VOICES = [
@@ -31,7 +38,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   piperEnabledOnPhone: false,
   kokoroVoiceId: 'af_heart',
   disableEditing: false,
+  simpleMode: false,
+  simpleModeDescription: 'describe',
+  lockPin: '',
 };
+
+export const PIN_RE = /^\d{4,8}$/;
 
 const STORAGE_KEY = 'allhail-settings-v1';
 
@@ -114,6 +126,12 @@ export function loadSettings(): AppSettings {
         typeof parsed.disableEditing === 'boolean'
           ? parsed.disableEditing
           : DEFAULT_SETTINGS.disableEditing,
+      simpleMode: typeof parsed.simpleMode === 'boolean' ? parsed.simpleMode : DEFAULT_SETTINGS.simpleMode,
+      simpleModeDescription:
+        parsed.simpleModeDescription === 'detail' || parsed.simpleModeDescription === 'describe'
+          ? parsed.simpleModeDescription
+          : DEFAULT_SETTINGS.simpleModeDescription,
+      lockPin: typeof parsed.lockPin === 'string' && PIN_RE.test(parsed.lockPin) ? parsed.lockPin : '',
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
