@@ -97,6 +97,7 @@ For a student who is blind or has low vision, a teacher or aide can turn on simp
 ## Where things live
 
 - `src/`: React app and styles (React 19, Tailwind 4).
+- `src/styles.css`: the look, a flat printed page with paper, ink and thick rules. Maroon is only for the thing to press. It also holds the four text sizes, dark mode, and the rules for the phone's own text size, contrast and motion settings.
 - `src/components/CaptureView.tsx`: student camera mode.
 - `src/components/HistoryView.tsx`: description history.
 - `src/components/SimpleModeView.tsx` and `SimpleModeSetup.tsx`: simple mode and where it is set up and locked.

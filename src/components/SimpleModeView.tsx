@@ -112,7 +112,7 @@ export function SimpleModeView({
 
   return (
     <main id="main" tabIndex={-1} className="simple-mode mx-auto flex min-h-screen max-w-2xl flex-col gap-5 px-4 pb-8 pt-5">
-      <h1 className="text-2xl font-bold">{strings.simpleModeTitle}</h1>
+      <h1 className="page-rule text-2xl font-bold">{strings.simpleModeTitle}</h1>
 
       <input
         ref={cameraInputRef}
@@ -178,7 +178,7 @@ export function SimpleModeView({
             onClick={takePhoto}
             aria-describedby={`${ids}-hint`}
             aria-busy={working || undefined}
-            className="simple-shutter primary-cta w-full rounded-sm px-6 text-4xl font-bold"
+            className="simple-shutter primary-cta w-full px-6 font-bold"
           >
             {strings.simpleTakePhoto}
           </button>
