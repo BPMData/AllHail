@@ -128,6 +128,11 @@ git clone --branch streamlit-final https://github.com/BPMData/tts_st.git ../allh
 
 The original Python files, Streamlit configuration and requirements are all there. No personal photos or secrets are included.
 
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: submitting a pull request gives
+the project's owner the right to relicense your contribution, including under commercial terms.
+
 ## Licence and credits
 
 AllHail is free software under the GNU General Public License v3.0 or later ([`LICENSE`](LICENSE)). It ships eSpeak NG, which is GPL. [`CREDITS.md`](CREDITS.md) lists every voice, model and library with its licence. It's free and non-commercial; don't sell it while it uses the Piper voice.
