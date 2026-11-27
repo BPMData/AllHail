@@ -24,7 +24,7 @@
 
 - Vite + React 19 + Tailwind 4 + TypeScript in the browser; Express `server.ts` on Node.
 - Production runs `node server.ts` with type stripping, so server-side code can't use `enum`, `namespace`, parameter properties or `import x = require()`. Check with `node -e "import('./server.ts').then(() => console.log('OK'))"`.
-- Tests with vitest. CI on GitHub Actions runs typecheck (`tsc --noEmit`), tests, build and a server smoke test.
+- Tests with vitest. CI on GitHub Actions runs lint (`npm run lint`: `tsc --noEmit` plus oxlint's React hooks rules only; `exhaustive-deps` is a warning), `prettier --check`, tests, build and a server smoke test.
 - `npm run dev` runs Express with Vite middleware. For install/offline checks, build first and use `NODE_ENV=production npm start`. `npm run test:pwa` checks desktop and Android-emulated Chrome; it does not replace physical-device or screen-reader checks.
 - Tests never call live AI or speech services; mock them. The bake-off tools are for humans with a key and real photos, not for CI.
 - All words the user sees go in one strings file so the app can be translated.
