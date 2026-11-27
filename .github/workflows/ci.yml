@@ -15,7 +15,7 @@ jobs:
           node-version: 24
       # Install the exact versions in package-lock.json.
       - run: npm ci --no-audit --no-fund
-      - run: npm run typecheck
+      - run: npm run lint
       - run: npx prettier --check .
       - run: npm run build
       - run: npm test
