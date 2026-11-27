@@ -9,10 +9,7 @@ import { VISION_MODEL_CHAINS } from './visionConfig.ts';
 
 const TINY_JPEG_DATA_URL = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64')}`;
 
-async function withServer(
-  describeDeps: DescribeDeps,
-  fn: (baseUrl: string) => Promise<void>,
-) {
+async function withServer(describeDeps: DescribeDeps, fn: (baseUrl: string) => Promise<void>) {
   const app = express();
   app.use((_req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
@@ -27,9 +24,7 @@ async function withServer(
   try {
     await fn(`http://127.0.0.1:${port}`);
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((err) => (err ? reject(err) : resolve())),
-    );
+    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
   }
 }
 
@@ -46,9 +41,7 @@ describe('server isolation headers', () => {
       expect(res.headers.get('cross-origin-opener-policy')).toBe('same-origin');
       expect(res.headers.get('cross-origin-embedder-policy')).toBe('credentialless');
     } finally {
-      await new Promise<void>((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      );
+      await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
     }
   });
 });
@@ -66,7 +59,7 @@ describe('POST /api/describe', () => {
         JSON.stringify({
           choices: [{ finish_reason: 'stop', message: { content: 'A sunny classroom whiteboard.' } }],
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     }) as unknown as typeof fetch;
 
@@ -102,18 +95,18 @@ describe('POST /api/describe', () => {
       if (attempt === 2) {
         return new Response(
           JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: 'Partial...' } }] }),
-          { status: 200 },
+          { status: 200 }
         );
       }
       if (attempt === 3) {
         return new Response(
           JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: "I can't help with that." } }] }),
-          { status: 200 },
+          { status: 200 }
         );
       }
       return new Response(
         JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'Complete detailed reading.' } }] }),
-        { status: 200 },
+        { status: 200 }
       );
     }) as unknown as typeof fetch;
 
@@ -143,8 +136,8 @@ describe('POST /api/describe', () => {
       return Promise.resolve(
         new Response(
           JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'Fallback succeeded.' } }] }),
-          { status: 200 },
-        ),
+          { status: 200 }
+        )
       );
     }) as unknown as typeof fetch;
 
@@ -160,7 +153,7 @@ describe('POST /api/describe', () => {
         const data = (await res.json()) as { text: string; model: string };
         expect(data.text).toBe('Fallback succeeded.');
         expect(modelsTried).toHaveLength(2);
-      },
+      }
     );
   });
 
@@ -182,7 +175,7 @@ describe('POST /api/describe', () => {
           body: JSON.stringify({ mode: 'detail', imageDataUrl: TINY_JPEG_DATA_URL }),
         });
         expect(res.status).toBe(504);
-      },
+      }
     );
   });
 
@@ -204,11 +197,11 @@ describe('POST /api/describe', () => {
 
   it('enforces per-IP rate limiting and returns 429', async () => {
     const rateLimiter = createRateLimiter({ maxRequests: 2, windowMs: 60_000 });
-    const fetchFn = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'Ok.' } }] }),
-        { status: 200 },
-      ),
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'Ok.' } }] }), {
+          status: 200,
+        })
     ) as unknown as typeof fetch;
 
     await withServer({ getApiKey: () => 'test-key', fetchFn, rateLimiter }, async (base) => {

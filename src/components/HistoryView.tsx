@@ -25,10 +25,7 @@ export function HistoryView({
 }: HistoryViewProps) {
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const countLabel =
-    entries.length === 1
-      ? strings.historyCountOne
-      : `${entries.length} ${strings.historyCountMany}`;
+  const countLabel = entries.length === 1 ? strings.historyCountOne : `${entries.length} ${strings.historyCountMany}`;
 
   const handleClearClick = () => {
     if (!confirmClear) {
@@ -67,21 +64,15 @@ export function HistoryView({
       ) : (
         <ul className="space-y-4">
           {entries.map((entry) => {
-            const modeLabel =
-              entry.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
+            const modeLabel = entry.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
             const dateText = new Date(entry.createdAt).toLocaleString();
-            const previewText =
-              entry.text.length > 180 ? `${entry.text.slice(0, 180).trimEnd()}…` : entry.text;
+            const previewText = entry.text.length > 180 ? `${entry.text.slice(0, 180).trimEnd()}…` : entry.text;
 
             return (
               <li key={entry.id} className="panel-card rounded-sm border p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                   {entry.thumbnailDataUrl && (
-                    <img
-                      src={entry.thumbnailDataUrl}
-                      alt=""
-                      className="h-24 w-24 shrink-0 rounded-sm object-cover"
-                    />
+                    <img src={entry.thumbnailDataUrl} alt="" className="h-24 w-24 shrink-0 rounded-sm object-cover" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold opacity-80">

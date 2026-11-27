@@ -12,7 +12,9 @@ type Fetched = { url: string; options: { payload?: string; headers?: Record<stri
 type Mail = Record<string, unknown>;
 
 function loadRelay({ githubStatus = 201, secret = 'relay-secret' } = {}) {
-  const props = new Map<string, string>(Object.entries({ GITHUB_TOKEN: 'github_pat_test', GITHUB_REPO: 'BPMData/allhail', RELAY_SECRET: secret }));
+  const props = new Map<string, string>(
+    Object.entries({ GITHUB_TOKEN: 'github_pat_test', GITHUB_REPO: 'BPMData/allhail', RELAY_SECRET: secret })
+  );
   const cache = new Map<string, string>();
   const fetched: Fetched[] = [];
   const mail: Mail[] = [];
@@ -25,22 +27,36 @@ function loadRelay({ githubStatus = 201, secret = 'relay-secret' } = {}) {
         getProperties: () => Object.fromEntries(props),
       }),
     },
-    CacheService: { getScriptCache: () => ({ get: (k: string) => cache.get(k) ?? null, put: (k: string, v: string) => void cache.set(k, v) }) },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k: string) => cache.get(k) ?? null,
+        put: (k: string, v: string) => void cache.set(k, v),
+      }),
+    },
     LockService: { getScriptLock: () => ({ waitLock: () => undefined, releaseLock: () => undefined }) },
     ContentService: {
       MimeType: { JSON: 'json' },
-      createTextOutput: (text: string) => ({ text, setMimeType() { return this; } }),
+      createTextOutput: (text: string) => ({
+        text,
+        setMimeType() {
+          return this;
+        },
+      }),
     },
     UrlFetchApp: {
       fetch: (url: string, options: Fetched['options']) => {
         fetched.push({ url, options });
         return {
           getResponseCode: () => githubStatus,
-          getContentText: () => JSON.stringify({ number: 42, html_url: 'https://github.com/BPMData/allhail/issues/42' }),
+          getContentText: () =>
+            JSON.stringify({ number: 42, html_url: 'https://github.com/BPMData/allhail/issues/42' }),
         };
       },
     },
-    MailApp: { sendEmail: (opts: Mail | string, subject?: string, body?: string) => void mail.push(typeof opts === 'string' ? { to: opts, subject, body } : opts) },
+    MailApp: {
+      sendEmail: (opts: Mail | string, subject?: string, body?: string) =>
+        void mail.push(typeof opts === 'string' ? { to: opts, subject, body } : opts),
+    },
     Session: { getEffectiveUser: () => ({ getEmail: () => 'overboard.reporting@gmail.com' }) },
     Utilities: {
       formatDate: (date: Date) => date.toISOString().slice(0, 10),
@@ -65,16 +81,32 @@ const report = {
   public: {
     category: 'descriptions',
     symptoms: ['no-description'],
-    diagnostics: { appVersion: '0.1.0', appBuilt: '2026-11-24', os: 'iOS 18.1', browser: 'Safari 18', deviceClass: 'phone', lastStatus: 'Could not describe photo. <b>@everyone</b>' },
+    diagnostics: {
+      appVersion: '0.1.0',
+      appBuilt: '2026-11-24',
+      os: 'iOS 18.1',
+      browser: 'Safari 18',
+      deviceClass: 'phone',
+      lastStatus: 'Could not describe photo. <b>@everyone</b>',
+    },
   },
-  private: { details: 'Nothing came back for my student Jamie’s worksheet.', steps: 'Full detail, then Take photo', email: 'teacher@example.org' },
+  private: {
+    details: 'Nothing came back for my student Jamie’s worksheet.',
+    steps: 'Full detail, then Take photo',
+    email: 'teacher@example.org',
+  },
 };
 
 describe('report relay (tools/report-relay.gs)', () => {
   it('opens a labeled issue in AllHail’s repo from the public part only', () => {
     const relay = loadRelay();
     const reply = relay.post(report);
-    expect(reply).toMatchObject({ ok: true, issue: 42, url: 'https://github.com/BPMData/allhail/issues/42', thanked: true });
+    expect(reply).toMatchObject({
+      ok: true,
+      issue: 42,
+      url: 'https://github.com/BPMData/allhail/issues/42',
+      thanked: true,
+    });
 
     const issueCall = relay.fetched.find((call) => call.url.endsWith('/issues'));
     expect(issueCall?.url).toBe('https://api.github.com/repos/BPMData/allhail/issues');

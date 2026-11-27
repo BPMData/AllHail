@@ -35,16 +35,20 @@ export function SimpleModeSetup({ settings, onStart }: SimpleModeSetupProps) {
 
   return (
     <section aria-labelledby={`${ids}-heading`} className="panel-card mt-8 rounded-sm border p-5 sm:p-6">
-      <h2 id={`${ids}-heading`} className="text-2xl font-bold">{strings.setupHeading}</h2>
+      <h2 id={`${ids}-heading`} className="text-2xl font-bold">
+        {strings.setupHeading}
+      </h2>
       <p className="mt-3 text-lg">{strings.setupIntro}</p>
 
       <fieldset className="mt-5">
         <legend className="text-lg font-bold">{strings.setupModeLegend}</legend>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {([
-            ['describe', strings.quickLook, strings.quickLookHint],
-            ['detail', strings.fullDetail, strings.fullDetailHint],
-          ] as const).map(([value, label, hint]) => (
+          {(
+            [
+              ['describe', strings.quickLook, strings.quickLookHint],
+              ['detail', strings.fullDetail, strings.fullDetailHint],
+            ] as const
+          ).map(([value, label, hint]) => (
             <label key={value} className={choice}>
               <input
                 type="radio"
@@ -64,8 +68,12 @@ export function SimpleModeSetup({ settings, onStart }: SimpleModeSetupProps) {
       </fieldset>
 
       <div className="mt-5">
-        <label htmlFor={`${ids}-pin`} className="block text-lg font-bold">{strings.setupPinLabel}</label>
-        <p id={`${ids}-pin-hint`} className="text-base opacity-85">{strings.setupPinHint}</p>
+        <label htmlFor={`${ids}-pin`} className="block text-lg font-bold">
+          {strings.setupPinLabel}
+        </label>
+        <p id={`${ids}-pin-hint`} className="text-base opacity-85">
+          {strings.setupPinHint}
+        </p>
         <MaskedPinInput
           id={`${ids}-pin`}
           value={pin}
@@ -75,17 +83,27 @@ export function SimpleModeSetup({ settings, onStart }: SimpleModeSetupProps) {
         />
         {pin && (
           <>
-            <label htmlFor={`${ids}-pin-again`} className="mt-4 block text-lg font-bold">{strings.setupPinConfirmLabel}</label>
+            <label htmlFor={`${ids}-pin-again`} className="mt-4 block text-lg font-bold">
+              {strings.setupPinConfirmLabel}
+            </label>
             <MaskedPinInput id={`${ids}-pin-again`} value={pinAgain} onChange={setPinAgain} className={field} />
           </>
         )}
       </div>
 
-      {error && <p role="alert" className="mt-4 text-lg font-bold">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-4 text-lg font-bold">
+          {error}
+        </p>
+      )}
 
       <p className="mt-5 text-base opacity-85">{strings.setupPhoneTip}</p>
 
-      <button type="button" onClick={start} className="primary-cta mt-5 min-h-[56px] rounded-sm px-6 py-3 text-lg font-bold">
+      <button
+        type="button"
+        onClick={start}
+        className="primary-cta mt-5 min-h-[56px] rounded-sm px-6 py-3 text-lg font-bold"
+      >
         {strings.setupStart}
       </button>
     </section>

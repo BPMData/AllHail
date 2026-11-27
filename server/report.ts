@@ -34,10 +34,12 @@ export function createReportHandler(deps: ReportDeps = {}) {
   const getRelaySecret = deps.getRelaySecret ?? (() => process.env.REPORT_RELAY_SECRET);
   const fetchFn = deps.fetchFn ?? fetch;
   const timeoutMs = deps.timeoutMs ?? REPORT_RELAY_TIMEOUT_MS;
-  const rateLimiter = deps.rateLimiter ?? createRateLimiter({
-    maxRequests: REPORT_RATE_LIMIT_MAX,
-    windowMs: REPORT_RATE_LIMIT_WINDOW_MS,
-  });
+  const rateLimiter =
+    deps.rateLimiter ??
+    createRateLimiter({
+      maxRequests: REPORT_RATE_LIMIT_MAX,
+      windowMs: REPORT_RATE_LIMIT_WINDOW_MS,
+    });
 
   return async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');

@@ -47,26 +47,9 @@ const NOVELTY_VOICES = new Set([
   'zarvox',
 ]);
 
-const CURATED_NATURAL_NAMES = [
-  'samantha',
-  'ava',
-  'daniel',
-  'karen',
-  'moira',
-  'tessa',
-  'rishi',
-];
+const CURATED_NATURAL_NAMES = ['samantha', 'ava', 'daniel', 'karen', 'moira', 'tessa', 'rishi'];
 
-const ELOQUENCE_NAMES = [
-  'reed',
-  'sandy',
-  'shelley',
-  'flo',
-  'eddy',
-  'rocko',
-  'grandma',
-  'grandpa',
-];
+const ELOQUENCE_NAMES = ['reed', 'sandy', 'shelley', 'flo', 'eddy', 'rocko', 'grandma', 'grandpa'];
 
 function isEnglishLang(lang: string): boolean {
   return /^en(?:[-_]|$)/i.test(lang.trim());
@@ -96,9 +79,7 @@ export function isOnlineOnlyDeviceVoice(voice: Pick<SpeechSynthesisVoice, 'name'
 /**
  * Returns non-novelty English (`en-*`) voices in browser order (deduplicated by name).
  */
-export function getAllowedEnglishDeviceVoices(
-  voices: readonly SpeechSynthesisVoice[],
-): SpeechSynthesisVoice[] {
+export function getAllowedEnglishDeviceVoices(voices: readonly SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   const seen = new Set<string>();
   const allowed: SpeechSynthesisVoice[] = [];
   for (const voice of voices) {
@@ -131,7 +112,7 @@ export function getDeviceVoiceShortName(name: string): string {
  */
 export function selectBestDeviceVoice(
   voices: readonly SpeechSynthesisVoice[],
-  options: { online?: boolean } = {},
+  options: { online?: boolean } = {}
 ): SpeechSynthesisVoice | null {
   const online = options.online ?? true;
   const allowed = getAllowedEnglishDeviceVoices(voices);
@@ -176,7 +157,7 @@ export function selectBestDeviceVoice(
 
 export function resolveDeviceVoice(
   voices: readonly SpeechSynthesisVoice[],
-  options: { preferredVoiceName?: string | null; online?: boolean } = {},
+  options: { preferredVoiceName?: string | null; online?: boolean } = {}
 ): { voice: SpeechSynthesisVoice | null; preferredMissing: boolean } {
   const online = options.online ?? true;
   const preferred = options.preferredVoiceName?.trim();
@@ -201,18 +182,14 @@ export function resolveDeviceVoice(
 export function getBrowserDeviceVoices(): SpeechSynthesisVoice[] {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
   try {
-    const voices = typeof window.speechSynthesis.getVoices === 'function'
-      ? window.speechSynthesis.getVoices()
-      : [];
+    const voices = typeof window.speechSynthesis.getVoices === 'function' ? window.speechSynthesis.getVoices() : [];
     return getAllowedEnglishDeviceVoices(voices);
   } catch {
     return [];
   }
 }
 
-export function subscribeBrowserDeviceVoices(
-  listener: (voices: SpeechSynthesisVoice[]) => void,
-): () => void {
+export function subscribeBrowserDeviceVoices(listener: (voices: SpeechSynthesisVoice[]) => void): () => void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return () => undefined;
   }
@@ -230,7 +207,7 @@ export function resolveVoiceOrder(
   deviceClass: DeviceClass,
   preference: VoiceOrderPreference,
   kokoroTooSlow = false,
-  piperTooSlow = false,
+  piperTooSlow = false
 ): readonly VoiceProviderId[] {
   let base: readonly VoiceProviderId[];
   if (preference === 'device-first') {
@@ -285,11 +262,10 @@ const retainedUtterances = new Set<SpeechSynthesisUtterance>();
 
 function pickCurrentVoice(
   synth: SpeechSynthesis,
-  options?: { deviceVoiceName?: string | null; online?: boolean },
+  options?: { deviceVoiceName?: string | null; online?: boolean }
 ): SpeechSynthesisVoice | null {
   const voices = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
-  const online =
-    options?.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const online = options?.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
   return resolveDeviceVoice(voices, {
     preferredVoiceName: options?.deviceVoiceName,
     online,
@@ -304,7 +280,7 @@ export const VOICES_WAIT_TIMEOUT_MS = 1500;
  */
 export function waitForDeviceVoices(
   synth: SpeechSynthesis,
-  timeoutMs = VOICES_WAIT_TIMEOUT_MS,
+  timeoutMs = VOICES_WAIT_TIMEOUT_MS
 ): { promise: Promise<readonly SpeechSynthesisVoice[]>; cancel: () => void } {
   const initial = typeof synth.getVoices === 'function' ? synth.getVoices() : [];
   if (initial.length > 0) {
@@ -362,13 +338,9 @@ export function waitForDeviceVoices(
   };
 }
 
-export function createBrowserDeviceVoiceProvider(options?: {
-  voicesWaitTimeoutMs?: number;
-}): VoiceProvider {
+export function createBrowserDeviceVoiceProvider(options?: { voicesWaitTimeoutMs?: number }): VoiceProvider {
   const hasSynth = () =>
-    typeof window !== 'undefined' &&
-    'speechSynthesis' in window &&
-    typeof SpeechSynthesisUtterance !== 'undefined';
+    typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
 
   if (hasSynth()) {
     window.speechSynthesis.getVoices?.();
@@ -409,8 +381,7 @@ export function createBrowserDeviceVoiceProvider(options?: {
 
       const speakSingleUtterance = (voices: readonly SpeechSynthesisVoice[]) => {
         if (stopped) return;
-        const online =
-          callbacks.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
+        const online = callbacks.online ?? (typeof navigator !== 'undefined' ? navigator.onLine : true);
         const selectedVoice = resolveDeviceVoice(voices, {
           preferredVoiceName: callbacks.deviceVoiceName,
           online,
@@ -646,7 +617,7 @@ export class SpeechCoordinator {
       piperTooSlow?: boolean;
       forceProvider?: VoiceProviderId;
       onProviderStarted?: (provider: VoiceProviderId) => void;
-    },
+    }
   ): VoiceProviderId | null {
     this.stop();
     const cleaned = cleanTextForSpeech(rawText);

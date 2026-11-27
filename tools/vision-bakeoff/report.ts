@@ -7,19 +7,25 @@
 import type { PromptName } from './prompts.ts';
 
 type R = {
-  model: string; photo: string; prompt: PromptName; ms: number;
-  promptTokens: number | null; completionTokens: number | null;
-  cost: number | null; text: string; error: string | null;
+  model: string;
+  photo: string;
+  prompt: PromptName;
+  ms: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  cost: number | null;
+  text: string;
+  error: string | null;
 };
 
-const esc = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // Same order every time the page is built, so a reload doesn't reshuffle.
 function shuffled<T>(items: T[], seed: string): T[] {
   let h = 2166136261;
   for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
-  const rand = () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 2 ** 32;
+  const rand = () =>
+    ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 2 ** 32;
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
@@ -29,7 +35,10 @@ function shuffled<T>(items: T[], seed: string): T[] {
 }
 
 export function renderReport(d: {
-  models: string[]; prompts: PromptName[]; photos: string[]; results: R[];
+  models: string[];
+  prompts: PromptName[];
+  photos: string[];
+  results: R[];
   thumbs: Record<string, string>;
   /** Link to each original photo, relative to the report, for the full-screen viewer. */
   fullSize?: Record<string, string>;

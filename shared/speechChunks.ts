@@ -46,7 +46,10 @@ export function splitTextForSpeech(cleanedText: string): string[] {
   const normalized = cleanedText.replace(/\s*\n+\s*/g, '\n').trim();
   if (!normalized) return [];
 
-  const paragraphs = normalized.split('\n').map((p) => p.trim()).filter(Boolean);
+  const paragraphs = normalized
+    .split('\n')
+    .map((p) => p.trim())
+    .filter(Boolean);
   const rawSentences: string[] = [];
 
   for (const para of paragraphs) {

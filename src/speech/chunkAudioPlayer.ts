@@ -47,7 +47,7 @@ export function isAudibleAudioBuffer(buffer: AudioBuffer): boolean {
 export function applyChunkEdgeFade(
   samples: Float32Array,
   sampleRate: number,
-  fadeMs = CHUNK_EDGE_FADE_MS,
+  fadeMs = CHUNK_EDGE_FADE_MS
 ): Float32Array {
   if (!samples || samples.length < 2 || !Number.isFinite(sampleRate) || sampleRate <= 0) {
     return samples;
@@ -65,10 +65,7 @@ export function applyChunkEdgeFade(
   return samples;
 }
 
-export function applyEdgeFadeToAudioBuffer(
-  buffer: AudioBuffer,
-  fadeMs = CHUNK_EDGE_FADE_MS,
-): AudioBuffer {
+export function applyEdgeFadeToAudioBuffer(buffer: AudioBuffer, fadeMs = CHUNK_EDGE_FADE_MS): AudioBuffer {
   if (!buffer || typeof buffer.getChannelData !== 'function') {
     return buffer;
   }
@@ -186,9 +183,7 @@ export function streamChunkedAudio<TChunk>({
     return { pause: () => undefined, resume: () => undefined, stop: () => undefined };
   }
 
-  const safeRate = Number.isFinite(playbackRate)
-    ? Math.min(2.5, Math.max(0.5, playbackRate))
-    : 1;
+  const safeRate = Number.isFinite(playbackRate) ? Math.min(2.5, Math.max(0.5, playbackRate)) : 1;
 
   let cancelled = false;
   let paused = false;

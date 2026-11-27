@@ -12,11 +12,16 @@ try {
     ['apple-touch-icon.png', 180, true],
     ['maskable-512.png', 512, true],
   ]) {
-    const svg = (maskable ? source.replace('rx="112"', 'rx="0"') : source)
-      .replace('<svg ', `<svg width="${size}" height="${size}" `);
+    const svg = (maskable ? source.replace('rx="112"', 'rx="0"') : source).replace(
+      '<svg ',
+      `<svg width="${size}" height="${size}" `
+    );
     await page.setViewportSize({ width: size, height: size });
     await page.setContent(`<style>body { margin: 0; } svg { display: block; }</style>${svg}`);
-    await page.screenshot({ path: new URL(`../public/icons/${name}`, import.meta.url).pathname, omitBackground: !maskable });
+    await page.screenshot({
+      path: new URL(`../public/icons/${name}`, import.meta.url).pathname,
+      omitBackground: !maskable,
+    });
   }
 } finally {
   await browser.close();

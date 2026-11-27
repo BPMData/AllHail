@@ -15,13 +15,17 @@ export const strings = {
   updateReady: 'A new version of AllHail is ready.',
   update: 'Update AllHail',
   installTitle: 'Install AllHail',
-  installChrome: 'In Chrome on a laptop, use the install icon in the address bar. On Android, open Chrome’s menu and choose Install app or Add to Home screen.',
+  installChrome:
+    'In Chrome on a laptop, use the install icon in the address bar. On Android, open Chrome’s menu and choose Install app or Add to Home screen.',
   installSafari: 'On iPhone or iPad, open Safari’s Share menu and choose Add to Home Screen.',
-  installOffline: 'Open AllHail online once and wait for “App saved for offline use” before opening it without internet.',
+  installOffline:
+    'Open AllHail online once and wait for “App saved for offline use” before opening it without internet.',
   privacyTitle: 'Your privacy',
-  privacy: 'AllHail has no accounts and keeps your history only on your device. Photos you ask it to describe are sent to an AI service through OpenRouter with data retention turned off. Don’t photograph students’ faces or private documents.',
+  privacy:
+    'AllHail has no accounts and keeps your history only on your device. Photos you ask it to describe are sent to an AI service through OpenRouter with data retention turned off. Don’t photograph students’ faces or private documents.',
   aboutHeading: 'About & voice credits',
-  piperAttribution: 'Piper voice hfc_female: Hi-Fi-CAPTAIN corpus (NICT), model by Rhasspy Piper, licensed CC BY-NC-SA 4.0, non-commercial use only.',
+  piperAttribution:
+    'Piper voice hfc_female: Hi-Fi-CAPTAIN corpus (NICT), model by Rhasspy Piper, licensed CC BY-NC-SA 4.0, non-commercial use only.',
   creditsIntro: 'Full license details for all voice engines are listed in',
   creditsLinkLabel: 'CREDITS.md',
   noScript: 'AllHail needs JavaScript turned on in your browser.',
@@ -52,7 +56,8 @@ export const strings = {
   liveViewfinderLabel: 'Live camera viewfinder',
   liveViewfinderActive: 'Live viewfinder is ready. Tap Take photo to snap a frame.',
   liveViewfinderStarting: 'Starting camera viewfinder…',
-  liveViewfinderDenied: 'Camera access was blocked. Use Take photo to open your phone camera, or choose an existing photo.',
+  liveViewfinderDenied:
+    'Camera access was blocked. Use Take photo to open your phone camera, or choose an existing photo.',
   liveViewfinderUnsupported: 'Live viewfinder is not available here. Use Take photo or Choose photo instead.',
   selectedPhotoHeading: 'Selected photo',
   selectedPhotoAlt: 'Prepared photo preview',
@@ -87,8 +92,10 @@ export const strings = {
   downloadingMp3: 'Making MP3…',
   mp3MakingProgressTemplate: 'Making MP3: {done} of {total}…',
   mp3ReadyStatusTemplate: 'MP3 saved using {voice}.',
-  mp3NeedsOfflineVoicePhone: 'Turn on Kokoro or Piper in Settings & Info to save an MP3. Device voices cannot be saved as files.',
-  mp3WaitOfflineVoice: 'Wait for Kokoro or Piper to finish preparing before saving an MP3. Device voices cannot be saved as files.',
+  mp3NeedsOfflineVoicePhone:
+    'Turn on Kokoro or Piper in Settings & Info to save an MP3. Device voices cannot be saved as files.',
+  mp3WaitOfflineVoice:
+    'Wait for Kokoro or Piper to finish preparing before saving an MP3. Device voices cannot be saved as files.',
   mp3Failed: 'Could not create the MP3 file. Please try again.',
   copyText: 'Copy text',
   copySuccessStatus: 'Description copied.',
@@ -136,9 +143,11 @@ export const strings = {
   activeVoicePiper: 'Piper',
   activeVoiceDevice: 'Device voice',
   autoReadLabel: 'Read descriptions aloud automatically',
-  autoReadHint: 'Turn off if you prefer your screen reader to read the description on screen without automatic app speech.',
+  autoReadHint:
+    'Turn off if you prefer your screen reader to read the description on screen without automatic app speech.',
   disableEditingLabel: 'Disable description editing',
-  disableEditingHint: 'Turn on to hide editing controls and keep the keyboard from opening accidentally when students use this device.',
+  disableEditingHint:
+    'Turn on to hide editing controls and keep the keyboard from opening accidentally when students use this device.',
   voiceOrderLabel: 'Preferred voice order',
   voiceOrderAuto: 'Automatic (Device voice first on phones; Kokoro, then Piper on laptops)',
   voiceOrderDeviceFirst: 'Device voice first, then Kokoro and Piper',
@@ -146,7 +155,7 @@ export const strings = {
   voiceOrderPiperFirst: 'Piper first, then Kokoro, then Device voice',
   deviceVoiceLabel: 'Device voice',
   deviceVoiceAuto: 'Automatic (recommended)',
-  deviceVoiceUnavailable: 'Your chosen voice isn\'t available on this device',
+  deviceVoiceUnavailable: "Your chosen voice isn't available on this device",
   deviceVoicePreviewTemplate: 'Hi, I’m {name}. Would you like me to be your reader for today?',
 
   // Kokoro voice (WebGPU fp32 only)
@@ -161,8 +170,10 @@ export const strings = {
   kokoroAnnounceHalf: 'Downloading the Kokoro voice: 50%',
   kokoroAnnounceReady: 'Kokoro voice ready',
   kokoroTooSlow: 'Kokoro is too slow on this device',
-  kokoroPhonePrompt: 'On phones, Kokoro (about 330 MB WebGPU download) stays off until you turn it on. Your device voice speaks right away.',
-  kokoroLaptopHint: 'On laptops with WebGPU, Kokoro prepares automatically (about 330 MB, cached by your browser). Laptops without WebGPU skip Kokoro and use Piper instead.',
+  kokoroPhonePrompt:
+    'On phones, Kokoro (about 330 MB WebGPU download) stays off until you turn it on. Your device voice speaks right away.',
+  kokoroLaptopHint:
+    'On laptops with WebGPU, Kokoro prepares automatically (about 330 MB, cached by your browser). Laptops without WebGPU skip Kokoro and use Piper instead.',
   kokoroEnablePhoneLabel: 'Download and use Kokoro voice on this phone (about 330 MB)',
   kokoroVoiceSelectLabel: 'Kokoro voice style',
   kokoroPreviewTemplate: 'Hi, I’m {name}. Would you like me to be your reader for today?',
@@ -184,8 +195,10 @@ export const strings = {
   piperAnnounceHalf: 'Downloading the Piper voice: 50%',
   piperAnnounceReady: 'Piper voice ready',
   piperTooSlow: 'Piper is too slow on this device',
-  piperPhonePromptTemplate: 'On phones, Piper (about {size} MB download) stays off until you turn it on. Your device voice speaks right away.',
-  piperLaptopHintTemplate: 'On laptops without Kokoro WebGPU, Piper prepares automatically (about {size} MB, cached by your browser). Your device voice speaks right away until it is ready.',
+  piperPhonePromptTemplate:
+    'On phones, Piper (about {size} MB download) stays off until you turn it on. Your device voice speaks right away.',
+  piperLaptopHintTemplate:
+    'On laptops without Kokoro WebGPU, Piper prepares automatically (about {size} MB, cached by your browser). Your device voice speaks right away until it is ready.',
   piperEnablePhoneLabelTemplate: 'Download and use Piper voice on this phone (about {size} MB)',
   piperPreviewButton: 'Preview Piper voice',
   piperDownloadButtonTemplate: 'Download Piper voice (about {size} MB)',
@@ -219,20 +232,24 @@ export const strings = {
   simpleWrongPin: 'That PIN isn’t right. Try again, or choose Stay in simple mode.',
   simpleModeOff: 'Simple mode is off. All settings are available.',
   setupHeading: 'Simple mode for a student',
-  setupIntro: 'Simple mode shows one very large Take photo button, reads each description aloud with the voice and speed chosen above, and locks everything else so it can’t be changed by accident. It stays on after the app is closed or updated.',
+  setupIntro:
+    'Simple mode shows one very large Take photo button, reads each description aloud with the voice and speed chosen above, and locks everything else so it can’t be changed by accident. It stays on after the app is closed or updated.',
   setupModeLegend: 'Description for each photo',
   setupPinLabel: 'PIN to leave simple mode (optional, 4 to 8 digits)',
-  setupPinHint: 'Without a PIN, leaving simple mode takes two deliberate presses. A PIN stops a student leaving it by accident; it isn’t a password.',
+  setupPinHint:
+    'Without a PIN, leaving simple mode takes two deliberate presses. A PIN stops a student leaving it by accident; it isn’t a password.',
   setupPinConfirmLabel: 'Type the PIN again',
   setupPinInvalid: 'The PIN must be 4 to 8 digits, or leave it empty.',
   setupPinMismatch: 'The two PINs don’t match.',
-  setupPhoneTip: 'To keep a student inside AllHail, also turn on Guided Access on an iPhone or iPad, or screen pinning on Android. Both are in the phone’s own Accessibility or Security settings.',
+  setupPhoneTip:
+    'To keep a student inside AllHail, also turn on Guided Access on an iPhone or iPad, or screen pinning on Android. Both are in the phone’s own Accessibility or Security settings.',
   setupStart: 'Start simple mode and lock settings',
   setupStarted: 'Simple mode is on. Settings are locked.',
   // "Something not working?" problem report
   reportEntry: 'Something not working?',
   reportHeading: 'Report a problem',
-  reportIntro: 'Tell the AllHail team what went wrong in a few short steps. You can skip anything you don’t know. Nothing is sent until you press Send report.',
+  reportIntro:
+    'Tell the AllHail team what went wrong in a few short steps. You can skip anything you don’t know. Nothing is sent until you press Send report.',
   reportStepTemplate: 'Step {n} of {total}',
   reportStepCategory: 'What went wrong?',
   reportStepCategoryHint: 'Choose the closest one.',
@@ -278,10 +295,12 @@ export const strings = {
   reportStepsHint: 'For example: I opened Camera, chose Full detail, then took a photo.',
   reportStepContact: 'Can we reply to you?',
   reportEmailLabel: 'Your email (optional)',
-  reportEmailHint: 'Only if you want a reply. It goes to the AllHail team’s private inbox, never into the public report.',
+  reportEmailHint:
+    'Only if you want a reply. It goes to the AllHail team’s private inbox, never into the public report.',
   reportEmailInvalid: 'That email address doesn’t look right. Fix it, or leave the box empty.',
   reportStepReview: 'Check and send',
-  reportReviewIntro: 'This is everything that will be sent. Your photos, descriptions and saved history are never included.',
+  reportReviewIntro:
+    'This is everything that will be sent. Your photos, descriptions and saved history are never included.',
   reportPublicHeading: 'Public: anyone can read this on GitHub',
   reportPrivateHeading: 'Private: only the AllHail team’s inbox',
   reportReviewCategory: 'What went wrong',

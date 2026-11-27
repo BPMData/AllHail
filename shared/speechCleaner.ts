@@ -1,15 +1,4 @@
-const NUMERATOR_WORDS = [
-  '',
-  'one',
-  'two',
-  'three',
-  'four',
-  'five',
-  'six',
-  'seven',
-  'eight',
-  'nine',
-];
+const NUMERATOR_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
 const DENOMINATOR_SINGULAR: Record<number, string> = {
   2: 'half',

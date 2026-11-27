@@ -21,10 +21,7 @@ describe('single onnxruntime-web and PWA runtime precache exclusion', () => {
 
   it('ships only the single .jsep ONNX WASM variant and never duplicates runtimes in public/', () => {
     const root = resolve(process.cwd());
-    expect(ORT_RUNTIME_FILES).toEqual([
-      'ort-wasm-simd-threaded.jsep.mjs',
-      'ort-wasm-simd-threaded.jsep.wasm',
-    ]);
+    expect(ORT_RUNTIME_FILES).toEqual(['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']);
     expect(PIPER_WASM_PATHS.onnxWasm).toEqual({
       mjs: '/ort/ort-wasm-simd-threaded.jsep.mjs',
       wasm: '/ort/ort-wasm-simd-threaded.jsep.wasm',

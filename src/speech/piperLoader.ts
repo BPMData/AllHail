@@ -38,8 +38,9 @@ export type PiperLoadResult<TSession extends PiperSessionLike = PiperSessionLike
  * Returns false cleanly in unsupported browsers or restricted private windows.
  */
 export async function isOpfsAvailable(
-  storage: Pick<StorageManager, 'getDirectory'> | undefined =
-    typeof navigator !== 'undefined' ? navigator.storage : undefined,
+  storage: Pick<StorageManager, 'getDirectory'> | undefined = typeof navigator !== 'undefined'
+    ? navigator.storage
+    : undefined
 ): Promise<boolean> {
   if (!storage || typeof storage.getDirectory !== 'function') return false;
   try {
@@ -121,7 +122,7 @@ export function inspectWavArrayBuffer(buffer: ArrayBuffer): {
 
 export async function runPiperCalibration<TSession extends PiperSessionLike>(
   session: TSession,
-  nowMs: () => number = () => performance.now(),
+  nowMs: () => number = () => performance.now()
 ): Promise<{ audible: boolean; tooSlow: boolean }> {
   try {
     // Pass 1: warm up phonemizer + WASM ORT session and discard timing.

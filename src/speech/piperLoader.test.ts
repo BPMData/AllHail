@@ -71,12 +71,12 @@ describe('isOpfsAvailable', () => {
     expect(
       await isOpfsAvailable({
         getDirectory: vi.fn().mockRejectedValue(new DOMException('Blocked', 'SecurityError')),
-      }),
+      })
     ).toBe(false);
     expect(
       await isOpfsAvailable({
         getDirectory: vi.fn().mockResolvedValue({} as FileSystemDirectoryHandle),
-      }),
+      })
     ).toBe(true);
   });
 });
@@ -143,9 +143,9 @@ describe('loadPiperSession', () => {
     };
 
     // First load fails after leaving a broken _instance -> loader must reset _instance = null.
-    await expect(
-      loadPiperSession({ sessionClass: FakeTtsSession, reset: true }),
-    ).rejects.toThrow('Model fetch interrupted');
+    await expect(loadPiperSession({ sessionClass: FakeTtsSession, reset: true })).rejects.toThrow(
+      'Model fetch interrupted'
+    );
     expect(FakeTtsSession._instance).toBeNull();
 
     // Retry with reset: true sees _instance === null and creates a clean working session.

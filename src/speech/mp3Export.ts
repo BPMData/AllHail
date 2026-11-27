@@ -32,7 +32,7 @@ export function resolveMp3Provider(options: {
     options.deviceClass,
     options.voiceOrder,
     options.kokoroTooSlow,
-    options.piperTooSlow,
+    options.piperTooSlow
   );
   const readySet = new Set<OfflineMp3ProviderId>();
   if (options.kokoroAllowed && options.kokoroReady) readySet.add('kokoro');
@@ -151,7 +151,7 @@ function applyEdgeFadeCopy(samples: Float32Array, sampleRate: number, fadeMs = 5
  */
 export function stitchPcmChunks(
   chunks: ReadonlyArray<PcmChunk>,
-  gapMs = 250,
+  gapMs = 250
 ): { samples: Int16Array; sampleRate: number } {
   if (chunks.length === 0) {
     throw new Error('No audio chunks to encode');
@@ -166,7 +166,7 @@ export function stitchPcmChunks(
 
   const totalLength = processed.reduce(
     (sum, item, idx) => sum + item.length + (idx < processed.length - 1 ? gapSamples : 0),
-    0,
+    0
   );
   const pcm16 = new Int16Array(totalLength);
 
@@ -212,11 +212,7 @@ export function encodeMonoMp3(samples: Int16Array, sampleRate: number, kbps = 96
   return new Blob(mp3Parts, { type: 'audio/mpeg' });
 }
 
-export function buildMp3Filename(options: {
-  sourceName?: string;
-  mode: PromptMode;
-  createdAt?: number;
-}): string {
+export function buildMp3Filename(options: { sourceName?: string; mode: PromptMode; createdAt?: number }): string {
   const modeSlug = options.mode === 'detail' ? 'full-detail' : 'quick-look';
   const rawBase = options.sourceName?.replace(/\.[^.]+$/, '').trim() ?? '';
   const sanitized = rawBase

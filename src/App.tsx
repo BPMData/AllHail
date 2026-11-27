@@ -124,10 +124,7 @@ export function App({
     };
   }, [injectedCoordinator, injectedKokoro, injectedPiper]);
 
-  const deviceClass = useMemo(
-    () => deviceClassOverride ?? detectDeviceClass(),
-    [deviceClassOverride],
-  );
+  const deviceClass = useMemo(() => deviceClassOverride ?? detectDeviceClass(), [deviceClassOverride]);
 
   const [online, setOnline] = useState(navigator.onLine);
   const [cacheError, setCacheError] = useState(false);
@@ -136,7 +133,7 @@ export function App({
   const [statusBeforeReport, setStatusBeforeReport] = useState('');
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [deviceVoices, setDeviceVoices] = useState<readonly SpeechSynthesisVoice[]>(
-    () => deviceVoicesOverride ?? getBrowserDeviceVoices(),
+    () => deviceVoicesOverride ?? getBrowserDeviceVoices()
   );
   const [kokoroState, setKokoroState] = useState<KokoroState>(() => runtime.kokoro.getState());
   const [piperState, setPiperState] = useState<PiperState>(() => runtime.piper.getState());
@@ -357,7 +354,7 @@ export function App({
         preferredVoiceName: settings.deviceVoiceName,
         online,
       }),
-    [deviceVoices, settings.deviceVoiceName, online],
+    [deviceVoices, settings.deviceVoiceName, online]
   );
 
   const kokoroAllowed = deviceClass === 'laptop' || settings.kokoroEnabledOnPhone;
@@ -384,7 +381,7 @@ export function App({
       piperState.status,
       piperState.tooSlow,
       piperAllowed,
-    ],
+    ]
   );
 
   const speakText = (text: string, rateOverride?: number, voiceOverride?: string) => {
@@ -414,10 +411,7 @@ export function App({
       online,
     });
     const unavailable = Boolean(voiceName && nextResolution.preferredMissing);
-    updateSettings(
-      { deviceVoiceName: voiceName },
-      unavailable ? strings.deviceVoiceUnavailable : undefined,
-    );
+    updateSettings({ deviceVoiceName: voiceName }, unavailable ? strings.deviceVoiceUnavailable : undefined);
 
     if (unavailable) {
       return;
@@ -493,7 +487,7 @@ export function App({
     if (piperState.status === 'error' || piperState.status === 'unavailable' || !piperAllowed) {
       pendingPiperPreviewRef.current = false;
       setPiperPreviewMessage(
-        piperState.status === 'unavailable' ? strings.piperPreviewUnavailable : strings.piperStatusError,
+        piperState.status === 'unavailable' ? strings.piperPreviewUnavailable : strings.piperStatusError
       );
     }
   }, [piperState.status, piperAllowed, activeTab]);
@@ -569,11 +563,7 @@ export function App({
     runtime.coordinator.unlockAudioOnly();
   };
 
-  const handleDescribePrepared = async (
-    photo: PreparedPhoto,
-    mode: PromptMode,
-    sourceName?: string,
-  ) => {
+  const handleDescribePrepared = async (photo: PreparedPhoto, mode: PromptMode, sourceName?: string) => {
     if (!online) {
       setStatusMessage(strings.statusOfflineCannotDescribe);
       return;
@@ -592,9 +582,12 @@ export function App({
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { text?: string; model?: string; mode?: PromptMode; message?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as {
+        text?: string;
+        model?: string;
+        mode?: PromptMode;
+        message?: string;
+      } | null;
 
       if (!response.ok || !data?.text) {
         setStatusMessage(data?.message ?? strings.errDescribeFailed);
@@ -602,9 +595,10 @@ export function App({
       }
 
       const entry: HistoryEntry = {
-        id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         createdAt: Date.now(),
         mode: data.mode ?? mode,
         model: data.model ?? 'vision',
@@ -626,9 +620,7 @@ export function App({
         speakText(entry.text);
       }
     } catch {
-      setStatusMessage(
-        navigator.onLine ? strings.errDescribeFailed : strings.statusOfflineCannotDescribe,
-      );
+      setStatusMessage(navigator.onLine ? strings.errDescribeFailed : strings.statusOfflineCannotDescribe);
     } finally {
       setBusy(false);
     }
@@ -672,7 +664,7 @@ export function App({
       piperState.status,
       piperState.tooSlow,
       piperAllowed,
-    ],
+    ]
   );
 
   const handleDownloadMp3 = async (item: {
@@ -729,8 +721,7 @@ export function App({
         createdAt: item.createdAt,
       });
       triggerMp3Download(exported.blob, filename);
-      const voiceLabel =
-        exported.provider === 'kokoro' ? strings.activeVoiceKokoro : strings.activeVoicePiper;
+      const voiceLabel = exported.provider === 'kokoro' ? strings.activeVoiceKokoro : strings.activeVoicePiper;
       setStatusMessage(strings.mp3ReadyStatusTemplate.replace('{voice}', voiceLabel));
     } catch {
       setStatusMessage(strings.mp3Failed);
@@ -799,9 +790,7 @@ export function App({
   };
 
   const handleSaveEdit = async (id: string, nextText: string) => {
-    const target =
-      (currentResult?.id === id ? currentResult : undefined) ??
-      history.find((item) => item.id === id);
+    const target = (currentResult?.id === id ? currentResult : undefined) ?? history.find((item) => item.id === id);
     if (!target || !nextText.trim()) return;
     runtime.coordinator.stop();
     const updated = applyDescriptionEdit(target, nextText);
@@ -810,24 +799,18 @@ export function App({
   };
 
   const handleResetOriginal = async (id: string, draftOverride?: string) => {
-    const target =
-      (currentResult?.id === id ? currentResult : undefined) ??
-      history.find((item) => item.id === id);
+    const target = (currentResult?.id === id ? currentResult : undefined) ?? history.find((item) => item.id === id);
     if (!target) return;
     runtime.coordinator.stop();
     const withDraft =
-      draftOverride && draftOverride.trim() && target.originalText
-        ? { ...target, text: draftOverride.trim() }
-        : target;
+      draftOverride && draftOverride.trim() && target.originalText ? { ...target, text: draftOverride.trim() } : target;
     const restored = resetDescriptionToOriginal(withDraft);
     await persistUpdatedEntry(restored);
     setStatusMessage(strings.editResetStatus);
   };
 
   const handleRestoreStashedEdit = async (id: string) => {
-    const target =
-      (currentResult?.id === id ? currentResult : undefined) ??
-      history.find((item) => item.id === id);
+    const target = (currentResult?.id === id ? currentResult : undefined) ?? history.find((item) => item.id === id);
     if (!target || !target.stashedEditedText) return;
     runtime.coordinator.stop();
     const restoredEdit = restoreStashedEdit(target);
@@ -924,7 +907,9 @@ export function App({
 
   return (
     <>
-      <a className="skip-link" href="#main">{strings.skipLink}</a>
+      <a className="skip-link" href="#main">
+        {strings.skipLink}
+      </a>
 
       <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-8 lg:pb-12 lg:pt-8">
         <header className="app-header mb-4 flex flex-wrap items-center justify-between gap-4 border py-3">
@@ -934,7 +919,9 @@ export function App({
             <p className="text-xl font-bold tracking-tight">{strings.appName}</p>
           </div>
 
-          <div aria-hidden="true" className="connection-pill">{online ? strings.online : strings.offline}</div>
+          <div aria-hidden="true" className="connection-pill">
+            {online ? strings.online : strings.offline}
+          </div>
 
           <button
             type="button"
@@ -981,7 +968,11 @@ export function App({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            className={statusMessage || cacheError || needRefresh ? "status-panel mb-6 rounded-sm border px-4 py-3 text-base" : "sr-only"}
+            className={
+              statusMessage || cacheError || needRefresh
+                ? 'status-panel mb-6 rounded-sm border px-4 py-3 text-base'
+                : 'sr-only'
+            }
           >
             <p className="sr-only">{online ? strings.online : strings.offline}</p>
             {statusMessage && <p className="mt-1 font-semibold">{statusMessage}</p>}

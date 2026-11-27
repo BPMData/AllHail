@@ -52,14 +52,17 @@ export async function createApp({
     if (!existsSync(resolve(dist, 'index.html'))) {
       throw new Error('Build the app with npm run build before starting production.');
     }
-    app.use(express.static(dist, {
-      setHeaders(res, filePath) {
-        // Always revalidate HTML, manifests and workers when a new build is deployed.
-        res.setHeader('Cache-Control', filePath.startsWith(resolve(dist, 'assets') + '/')
-          ? 'public, max-age=31536000, immutable'
-          : 'no-cache');
-      },
-    }));
+    app.use(
+      express.static(dist, {
+        setHeaders(res, filePath) {
+          // Always revalidate HTML, manifests and workers when a new build is deployed.
+          res.setHeader(
+            'Cache-Control',
+            filePath.startsWith(resolve(dist, 'assets') + '/') ? 'public, max-age=31536000, immutable' : 'no-cache'
+          );
+        },
+      })
+    );
     app.get('*', (req, res, next) => {
       // Missing scripts/icons must be real 404s, never HTML with the wrong MIME type.
       if (req.path.includes('.') || !req.accepts('html')) return next();
@@ -71,10 +74,22 @@ export async function createApp({
     const vite = await createServer({ root, server: { middlewareMode: true }, appType: 'spa' });
     // Serve the single self-hosted JSEP ONNX variant, Piper phonemizer, and CREDITS directly from node_modules/root.
     const devRuntimeFiles = new Map<string, string>([
-      ['/ort/ort-wasm-simd-threaded.jsep.mjs', resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs')],
-      ['/ort/ort-wasm-simd-threaded.jsep.wasm', resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm')],
-      ['/piper/piper_phonemize.wasm', resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.wasm')],
-      ['/piper/piper_phonemize.data', resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.data')],
+      [
+        '/ort/ort-wasm-simd-threaded.jsep.mjs',
+        resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs'),
+      ],
+      [
+        '/ort/ort-wasm-simd-threaded.jsep.wasm',
+        resolve(root, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm'),
+      ],
+      [
+        '/piper/piper_phonemize.wasm',
+        resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.wasm'),
+      ],
+      [
+        '/piper/piper_phonemize.data',
+        resolve(root, 'node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.data'),
+      ],
       ['/CREDITS.md', resolve(root, 'CREDITS.md')],
     ]);
     app.use((req, res, next) => {

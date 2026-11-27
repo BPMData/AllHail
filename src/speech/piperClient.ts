@@ -85,10 +85,7 @@ export class PiperBrowserClient {
   }
 
   isSupported(): boolean {
-    return (
-      Boolean(this.options.synthesizer || this.options.createWorker) ||
-      typeof Worker !== 'undefined'
-    );
+    return Boolean(this.options.synthesizer || this.options.createWorker) || typeof Worker !== 'undefined';
   }
 
   isReady(): boolean {
@@ -143,10 +140,7 @@ export class PiperBrowserClient {
           typeof msg.modelProgress === 'number'
             ? Math.min(
                 99,
-                Math.round(
-                  RUNTIME_PROGRESS_SHARE +
-                    (msg.modelProgress / 100) * (99 - RUNTIME_PROGRESS_SHARE),
-                ),
+                Math.round(RUNTIME_PROGRESS_SHARE + (msg.modelProgress / 100) * (99 - RUNTIME_PROGRESS_SHARE))
               )
             : (msg.progress ?? this.state.progress);
         const startedAt =
@@ -206,11 +200,7 @@ export class PiperBrowserClient {
 
   startDownload(reset = false): void {
     if (!this.isSupported()) return;
-    if (
-      this.state.status === 'ready' ||
-      this.state.status === 'downloading' ||
-      this.state.status === 'unavailable'
-    ) {
+    if (this.state.status === 'ready' || this.state.status === 'downloading' || this.state.status === 'unavailable') {
       return;
     }
 
@@ -239,16 +229,11 @@ export class PiperBrowserClient {
           return;
         }
 
-        const warmRuntime =
-          this.options.warmRuntime ??
-          ((onProgress) => warmPiperRuntimeCache({ onProgress }));
+        const warmRuntime = this.options.warmRuntime ?? ((onProgress) => warmPiperRuntimeCache({ onProgress }));
 
         await warmRuntime((fraction) => {
           if (gen !== this.downloadGeneration) return;
-          const pct = Math.min(
-            RUNTIME_PROGRESS_SHARE,
-            Math.max(0, Math.round(fraction * RUNTIME_PROGRESS_SHARE)),
-          );
+          const pct = Math.min(RUNTIME_PROGRESS_SHARE, Math.max(0, Math.round(fraction * RUNTIME_PROGRESS_SHARE)));
           if (this.state.status === 'downloading' && pct > this.state.progress) {
             this.setState({
               ...this.state,
@@ -326,7 +311,7 @@ export class PiperBrowserClient {
     options: {
       onProgress?: (done: number, total: number) => void;
       signal?: AbortSignal;
-    } = {},
+    } = {}
   ): Promise<ArrayBuffer[]> {
     const chunksText = splitTextForSpeech(cleanedText);
     if (chunksText.length === 0) return [];

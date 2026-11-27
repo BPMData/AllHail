@@ -111,7 +111,9 @@ describe('KokoroBrowserClient sentence streaming queue', () => {
     const { ctx } = makeMockAudioContext();
     const client = new KokoroBrowserClient({ createAudioContext: () => ctx });
     expect(() => client.playSettingsClick()).not.toThrow();
-    expect((ctx as unknown as { createOscillator: ReturnType<typeof vi.fn> }).createOscillator).toHaveBeenCalledTimes(1);
+    expect((ctx as unknown as { createOscillator: ReturnType<typeof vi.fn> }).createOscillator).toHaveBeenCalledTimes(
+      1
+    );
   });
 
   it('sets cached: true on initial downloading state when model is already cached', async () => {

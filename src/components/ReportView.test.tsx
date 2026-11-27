@@ -11,10 +11,15 @@ afterEach(() => {
 
 const diagnostics = { appVersion: '0.1.0', os: 'Android 15', browser: 'Chrome 131', online: true, speaking: false };
 
-function setup({ online = true, result = { ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/7' } as SendReportResult } = {}) {
+function setup({
+  online = true,
+  result = { ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/7' } as SendReportResult,
+} = {}) {
   const sendReport = vi.fn(async (_report: ProblemReport) => result);
   const onClose = vi.fn();
-  render(<ReportView online={online} getDiagnostics={async () => diagnostics} onClose={onClose} sendReport={sendReport} />);
+  render(
+    <ReportView online={online} getDiagnostics={async () => diagnostics} onClose={onClose} sendReport={sendReport} />
+  );
   return { sendReport, onClose };
 }
 
@@ -75,7 +80,9 @@ describe('guided problem report', () => {
     const sent = sendReport.mock.calls[0][0];
     expect(sent.public).toEqual({ category: 'speech', symptoms: ['nothing-read'], diagnostics });
     expect(sent.private).toEqual({ details: 'It stopped after one sentence.', steps: '', email: 'me@example.org' });
-    expect(screen.getByRole('link', { name: strings.reportIssueLink }).getAttribute('href')).toBe('https://github.com/BPMData/allhail/issues/7');
+    expect(screen.getByRole('link', { name: strings.reportIssueLink }).getAttribute('href')).toBe(
+      'https://github.com/BPMData/allhail/issues/7'
+    );
     expect(screen.getByRole('status').textContent).toContain(strings.reportSentHeading);
   });
 
@@ -131,18 +138,32 @@ describe('guided problem report', () => {
 });
 
 describe('sendReportToServer', () => {
-  const report = { app: 'AllHail', kind: 'problem-report', public: { category: 'other', symptoms: [], diagnostics: {} }, private: { details: '', steps: '', email: '' } } as ProblemReport;
+  const report = {
+    app: 'AllHail',
+    kind: 'problem-report',
+    public: { category: 'other', symptoms: [], diagnostics: {} },
+    private: { details: '', steps: '', email: '' },
+  } as ProblemReport;
 
   it('posts to /api/report and returns the issue link', async () => {
-    const fetchFn = vi.fn<typeof fetch>(async () => Response.json({ ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/3' }));
-    expect(await sendReportToServer(report, fetchFn)).toEqual({ ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/3' });
+    const fetchFn = vi.fn<typeof fetch>(async () =>
+      Response.json({ ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/3' })
+    );
+    expect(await sendReportToServer(report, fetchFn)).toEqual({
+      ok: true,
+      issueUrl: 'https://github.com/BPMData/allhail/issues/3',
+    });
     expect(fetchFn.mock.calls[0][0]).toBe('/api/report');
   });
 
   it('turns server errors and network failures into a message', async () => {
-    const unavailable = vi.fn<typeof fetch>(async () => Response.json({ error: 'reports_unavailable', message: 'nope' }, { status: 503 }));
+    const unavailable = vi.fn<typeof fetch>(async () =>
+      Response.json({ error: 'reports_unavailable', message: 'nope' }, { status: 503 })
+    );
     expect(await sendReportToServer(report, unavailable)).toEqual({ ok: false, message: 'nope' });
-    const down = vi.fn<typeof fetch>(async () => { throw new TypeError('offline'); });
+    const down = vi.fn<typeof fetch>(async () => {
+      throw new TypeError('offline');
+    });
     expect(await sendReportToServer(report, down)).toEqual({ ok: false, message: strings.errReportFailed });
   });
 });

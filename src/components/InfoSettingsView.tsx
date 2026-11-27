@@ -75,9 +75,7 @@ export function InfoSettingsView({
       return kokoroState.tooSlow ? strings.kokoroTooSlow : strings.kokoroStatusReady;
     }
     if (kokoroState.status === 'downloading') {
-      const label = kokoroState.cached
-        ? strings.kokoroCachedStatusLoading
-        : strings.kokoroStatusDownloading;
+      const label = kokoroState.cached ? strings.kokoroCachedStatusLoading : strings.kokoroStatusDownloading;
       return `${label} (${kokoroState.progress}%)`;
     }
     if (kokoroState.status === 'error') return strings.kokoroStatusError;
@@ -138,13 +136,7 @@ export function InfoSettingsView({
         </p>
 
         {/* Quiet polite live announcement for screen readers when a setting saves */}
-        <span
-          className="sr-only"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="settings-saved-live"
-        >
+        <span className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="settings-saved-live">
           {savedAnnouncement}
         </span>
 
@@ -237,10 +229,8 @@ export function InfoSettingsView({
             <option value="">{strings.deviceVoiceAuto}</option>
             {settings.deviceVoiceName &&
               !deviceVoices.some(
-                (v) => v.name.trim().toLowerCase() === settings.deviceVoiceName!.trim().toLowerCase(),
-              ) && (
-                <option value={settings.deviceVoiceName}>{settings.deviceVoiceName}</option>
-              )}
+                (v) => v.name.trim().toLowerCase() === settings.deviceVoiceName!.trim().toLowerCase()
+              ) && <option value={settings.deviceVoiceName}>{settings.deviceVoiceName}</option>}
             {deviceVoices.map((voice) => (
               <option key={voice.name} value={voice.name}>
                 {voice.name}
@@ -326,9 +316,7 @@ export function InfoSettingsView({
         {/* Piper CPU browser voice */}
         <div className="mt-5 space-y-4">
           <h2 className="text-xl font-bold">{piperHeading}</h2>
-          <p className="text-base opacity-90">
-            {deviceClass === 'phone' ? piperPhonePrompt : piperLaptopHint}
-          </p>
+          <p className="text-base opacity-90">{deviceClass === 'phone' ? piperPhonePrompt : piperLaptopHint}</p>
 
           {deviceClass === 'phone' && piperState.status !== 'unavailable' && (
             <label className="flex min-h-[48px] cursor-pointer items-start gap-3">
@@ -399,11 +387,7 @@ export function InfoSettingsView({
       {/* Install, Privacy, and About / Attribution section */}
       <section aria-label={strings.installTitle} className="space-y-4">
         {needRefresh && (
-          <button
-            type="button"
-            className="update-button rounded-sm px-6 py-3 font-bold"
-            onClick={onUpdateApp}
-          >
+          <button type="button" className="update-button rounded-sm px-6 py-3 font-bold" onClick={onUpdateApp}>
             {strings.update}
           </button>
         )}
@@ -429,10 +413,7 @@ export function InfoSettingsView({
           </p>
           <p className="mt-2 text-base">
             {strings.creditsIntro}{' '}
-            <a
-              href="/CREDITS.md"
-              className="font-bold underline"
-            >
+            <a href="/CREDITS.md" className="font-bold underline">
               {strings.creditsLinkLabel}
             </a>
             .

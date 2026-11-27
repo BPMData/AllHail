@@ -217,7 +217,9 @@ export const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
  * Status messages are only reported when they are the app's own words (or its error prefix followed
  * by its own words), so nothing the person or a model wrote can slip in.
  */
-const KNOWN_MESSAGES = new Set<string>(Object.values(strings as Record<string, unknown>).filter((value): value is string => typeof value === 'string'));
+const KNOWN_MESSAGES = new Set<string>(
+  Object.values(strings as Record<string, unknown>).filter((value): value is string => typeof value === 'string')
+);
 export function safeStatusMessage(message: string): string {
   const text = message.trim();
   if (!text) return '';
@@ -231,13 +233,21 @@ export function safeStatusMessage(message: string): string {
 }
 
 function cleanLine(value: string, max: number): string {
-  return value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  return value
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
 }
 
 function cleanText(value: unknown, max: number): string {
   if (typeof value !== 'string') return '';
   // Keep line breaks in free text, drop other control characters.
-  return value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, ' ').trim().slice(0, max);
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, ' ')
+    .trim()
+    .slice(0, max);
 }
 
 export function sanitizeDiagnostics(input: unknown): Diagnostics {

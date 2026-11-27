@@ -11,7 +11,10 @@ describe('simple mode settings', () => {
   });
 
   it('keeps valid saved values', () => {
-    localStorage.setItem(KEY, JSON.stringify({ ...DEFAULT_SETTINGS, simpleMode: true, simpleModeDescription: 'detail', lockPin: '12345678' }));
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, simpleMode: true, simpleModeDescription: 'detail', lockPin: '12345678' })
+    );
     expect(loadSettings()).toMatchObject({ simpleMode: true, simpleModeDescription: 'detail', lockPin: '12345678' });
   });
 

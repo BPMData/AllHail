@@ -13,6 +13,15 @@
     "erasableSyntaxOnly": true,
     "types": ["node", "vite/client", "vite-plugin-pwa/react"]
   },
-  "include": ["src", "shared", "server", "server.ts", "vite.config.ts", "vitest.config.ts", "playwright.config.ts", "tests"],
+  "include": [
+    "src",
+    "shared",
+    "server",
+    "server.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "tests"
+  ],
   "exclude": ["dist", "node_modules", "tools"]
 }

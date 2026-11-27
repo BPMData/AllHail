@@ -30,12 +30,10 @@ export interface VerifyDistRuntimeAssetsResult {
 
 export declare function copySelfHostedRuntimesToDist(rootDir?: string): PiperSizeMeasurement;
 export declare function measurePiperDownloadSize(rootDir?: string): PiperSizeMeasurement;
-export declare function findOnnxRuntimeVersionsInNodeModules(
-  rootDir?: string,
-): OnnxRuntimePackageEntry[];
+export declare function findOnnxRuntimeVersionsInNodeModules(rootDir?: string): OnnxRuntimePackageEntry[];
 export declare function findOnnxRuntimeVersionStringsInDist(distDir: string): string[];
 export declare function verifySingleOnnxRuntime(
   rootDir?: string,
-  options?: { checkDist?: boolean },
+  options?: { checkDist?: boolean }
 ): VerifySingleOnnxRuntimeResult;
 export declare function verifyDistRuntimeAssets(rootDir?: string): VerifyDistRuntimeAssetsResult;
