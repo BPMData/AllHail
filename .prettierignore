@@ -1,0 +1,15 @@
+# Build output and generated files
+dist/
+coverage/
+playwright-report/
+test-results/
+public/ort/
+public/piper/
+
+# Dependencies and lockfiles (npm owns the formatting of these)
+node_modules/
+package-lock.json
+
+# Markdown and docs are left as written (decision: owner chose to ignore them)
+*.md
+docs/
