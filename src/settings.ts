@@ -61,21 +61,19 @@ export type DeviceCapabilities = {
  */
 export function detectDeviceClass(caps?: DeviceCapabilities): DeviceClass {
   const maxTouchPoints =
-    caps?.maxTouchPoints ?? (typeof navigator !== 'undefined' ? navigator.maxTouchPoints ?? 0 : 0);
+    caps?.maxTouchPoints ?? (typeof navigator !== 'undefined' ? (navigator.maxTouchPoints ?? 0) : 0);
   const coarsePointer =
     caps?.coarsePointer ??
     (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(pointer: coarse)').matches
       : false);
-  const viewportWidth =
-    caps?.viewportWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const viewportWidth = caps?.viewportWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
   const deviceMemory =
     caps?.deviceMemory ??
     (typeof navigator !== 'undefined' && 'deviceMemory' in navigator
       ? Number((navigator as { deviceMemory?: number }).deviceMemory)
       : undefined);
-  const hasWebGPU =
-    caps?.hasWebGPU ?? (typeof navigator !== 'undefined' && 'gpu' in navigator);
+  const hasWebGPU = caps?.hasWebGPU ?? (typeof navigator !== 'undefined' && 'gpu' in navigator);
 
   const touchPrimary = coarsePointer || (maxTouchPoints > 0 && viewportWidth < 900);
   if (touchPrimary && (viewportWidth < 900 || (typeof deviceMemory === 'number' && deviceMemory <= 4) || !hasWebGPU)) {
@@ -89,9 +87,10 @@ export function loadSettings(): AppSettings {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    const rate = typeof parsed.speechRate === 'number' && parsed.speechRate >= 0.5 && parsed.speechRate <= 2.5
-      ? parsed.speechRate
-      : DEFAULT_SETTINGS.speechRate;
+    const rate =
+      typeof parsed.speechRate === 'number' && parsed.speechRate >= 0.5 && parsed.speechRate <= 2.5
+        ? parsed.speechRate
+        : DEFAULT_SETTINGS.speechRate;
     const voiceOrder: VoiceOrderPreference =
       parsed.voiceOrder === 'device-first' ||
       parsed.voiceOrder === 'kokoro-first' ||
@@ -123,9 +122,7 @@ export function loadSettings(): AppSettings {
           : DEFAULT_SETTINGS.piperEnabledOnPhone,
       kokoroVoiceId,
       disableEditing:
-        typeof parsed.disableEditing === 'boolean'
-          ? parsed.disableEditing
-          : DEFAULT_SETTINGS.disableEditing,
+        typeof parsed.disableEditing === 'boolean' ? parsed.disableEditing : DEFAULT_SETTINGS.disableEditing,
       simpleMode: typeof parsed.simpleMode === 'boolean' ? parsed.simpleMode : DEFAULT_SETTINGS.simpleMode,
       simpleModeDescription:
         parsed.simpleModeDescription === 'detail' || parsed.simpleModeDescription === 'describe'

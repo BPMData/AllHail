@@ -1,8 +1,6 @@
 import type { PromptMode } from '../shared/prompts.ts';
 
-export type ReasoningConfig =
-  | { enabled: false }
-  | { effort: 'low' | 'medium' | 'high'; exclude?: boolean };
+export type ReasoningConfig = { enabled: false } | { effort: 'low' | 'medium' | 'high'; exclude?: boolean };
 
 export type ModelStep = {
   model: string;

@@ -13,7 +13,7 @@ import {
 function fakeProvider(
   id: 'device' | 'kokoro' | 'piper',
   ready: boolean,
-  options?: { failBeforeStart?: boolean; stallStart?: boolean; busy?: boolean },
+  options?: { failBeforeStart?: boolean; stallStart?: boolean; busy?: boolean }
 ): VoiceProvider & { calls: string[]; stopSpies: ReturnType<typeof vi.fn>[] } {
   const calls: string[] = [];
   const stopSpies: ReturnType<typeof vi.fn>[] = [];
@@ -342,10 +342,7 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
 
   it('follows v3 priority: Google UK Female -> Google US -> Natural -> Allison (Enhanced) -> Premium/Enhanced -> Samantha..Rishi -> Eloquence -> default', () => {
     // System default over generic English, then first English
-    const tierDefault = [
-      makeVoice('Alex', 'en-US', false),
-      makeVoice('Custom Default', 'en-GB', true),
-    ];
+    const tierDefault = [makeVoice('Alex', 'en-US', false), makeVoice('Custom Default', 'en-GB', true)];
     expect(selectBestDeviceVoice(tierDefault)?.name).toBe('Custom Default');
 
     // Eloquence tier beats system default, ordered Reed -> ... -> Grandpa
@@ -375,7 +372,7 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
       makeVoice('Microsoft Ava Online (Natural) - English (United States)', 'en-US'),
     ];
     expect(selectBestDeviceVoice(tierNatural, { online: true })?.name).toBe(
-      'Microsoft Ava Online (Natural) - English (United States)',
+      'Microsoft Ava Online (Natural) - English (United States)'
     );
 
     // Google US English beats Edge Natural when online
@@ -384,9 +381,7 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
 
     // Google UK English Female sits at #1 overall when online
     const tierGoogleUk = [...tierGoogleUs, makeVoice('Google UK English Female', 'en-GB')];
-    expect(selectBestDeviceVoice(tierGoogleUk, { online: true })?.name).toBe(
-      'Google UK English Female',
-    );
+    expect(selectBestDeviceVoice(tierGoogleUk, { online: true })?.name).toBe('Google UK English Female');
   });
 
   it('skips Online and Google voices when offline and falls back quietly if saved preference is unavailable', () => {
@@ -400,9 +395,7 @@ describe('device voice automatic order, novelty filter, offline skipping, and pr
     ];
 
     // Online picks Google UK English Female first
-    expect(selectBestDeviceVoice(voices, { online: true })?.name).toBe(
-      'Google UK English Female',
-    );
+    expect(selectBestDeviceVoice(voices, { online: true })?.name).toBe('Google UK English Female');
 
     // Offline skips Online and Google voices -> picks Daniel
     expect(selectBestDeviceVoice(voices, { online: false })?.name).toBe('Daniel');

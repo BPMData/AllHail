@@ -88,9 +88,7 @@ export class KokoroBrowserClient {
   }
 
   isSupported(): boolean {
-    return (
-      Boolean(this.options.synthesizer || this.options.createWorker) || typeof Worker !== 'undefined'
-    );
+    return Boolean(this.options.synthesizer || this.options.createWorker) || typeof Worker !== 'undefined';
   }
 
   isReady(): boolean {
@@ -264,7 +262,7 @@ export class KokoroBrowserClient {
     chunkIndex: number,
     text: string,
     voice: string,
-    speed: number,
+    speed: number
   ): Promise<{ samples: Float32Array; sampleRate: number }> {
     if (this.options.synthesizer) {
       return this.options.synthesizer.synthesizeChunk({ jobId, chunkIndex, text, voice, speed });
@@ -305,7 +303,7 @@ export class KokoroBrowserClient {
       rate: number;
       onProgress?: (done: number, total: number) => void;
       signal?: AbortSignal;
-    },
+    }
   ): Promise<Array<{ samples: Float32Array; sampleRate: number }>> {
     const chunksText = splitTextForSpeech(cleanedText);
     if (chunksText.length === 0) return [];

@@ -24,10 +24,7 @@ let ttsInstance: KokoroTTS | null = null;
 const fileProgress = new Map<string, { loaded: number; total: number }>();
 const cancelledJobs = new Set<number>();
 
-function reportProgress(
-  event: KokoroLoadProgress,
-  info: { backend: KokoroBackend; sizeMb: number; cached: boolean },
-) {
+function reportProgress(event: KokoroLoadProgress, info: { backend: KokoroBackend; sizeMb: number; cached: boolean }) {
   if (event.file && typeof event.loaded === 'number' && typeof event.total === 'number' && event.total > 0) {
     fileProgress.set(event.file, { loaded: event.loaded, total: event.total });
     let loaded = 0;
@@ -62,8 +59,9 @@ function reportProgress(
 async function detectWebGpuAdapter(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
   try {
-    const adapter = await (navigator as Navigator & { gpu: { requestAdapter: () => Promise<unknown> } })
-      .gpu.requestAdapter();
+    const adapter = await (
+      navigator as Navigator & { gpu: { requestAdapter: () => Promise<unknown> } }
+    ).gpu.requestAdapter();
     return Boolean(adapter);
   } catch {
     return false;
@@ -158,7 +156,7 @@ self.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
         const sampleRate = audio.sampling_rate || 24000;
         self.postMessage(
           { type: 'chunkAudio', jobId: data.jobId, chunkIndex: data.chunkIndex, samples, sampleRate },
-          { transfer: [samples.buffer] },
+          { transfer: [samples.buffer] }
         );
       } catch (error: unknown) {
         if (cancelledJobs.has(data.jobId)) return;

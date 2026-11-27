@@ -30,3 +30,4 @@
 - All words the user sees go in one strings file so the app can be translated.
 - Plain-language commit messages and docs. The owner is a teacher, not a full-time developer.
 - Before removing the old Streamlit files (PLAN step 2), tag the last Streamlit commit `streamlit-final` so the old app can always be recovered.
+- Before committing, run `npx prettier --write` on the files you changed. CI runs `npx prettier --check .`.

@@ -107,7 +107,7 @@ self.addEventListener('message', (event: MessageEvent<IncomingMessage>) => {
         }
         self.postMessage(
           { type: 'chunkWav', jobId: data.jobId, chunkIndex: data.chunkIndex, wavBuffer },
-          { transfer: [wavBuffer] },
+          { transfer: [wavBuffer] }
         );
       } catch (error: unknown) {
         if (cancelledJobs.has(data.jobId)) return;

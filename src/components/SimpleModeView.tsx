@@ -112,7 +112,11 @@ export function SimpleModeView({
   const speaking = speechStatus.speaking || speechStatus.paused;
 
   return (
-    <main id="main" tabIndex={-1} className="simple-mode mx-auto flex min-h-screen max-w-2xl flex-col gap-5 px-4 pb-8 pt-5">
+    <main
+      id="main"
+      tabIndex={-1}
+      className="simple-mode mx-auto flex min-h-screen max-w-2xl flex-col gap-5 px-4 pb-8 pt-5"
+    >
       <h1 className="page-rule text-2xl font-bold">{strings.simpleModeTitle}</h1>
 
       <input
@@ -141,8 +145,14 @@ export function SimpleModeView({
                 tryUnlock();
               }}
             >
-              <label htmlFor={`${ids}-pin`} className="block text-xl font-bold">{strings.simpleUnlockPinLabel}</label>
-              {wrongPin && <p role="alert" className="mt-2 text-xl font-bold">{strings.simpleWrongPin}</p>}
+              <label htmlFor={`${ids}-pin`} className="block text-xl font-bold">
+                {strings.simpleUnlockPinLabel}
+              </label>
+              {wrongPin && (
+                <p role="alert" className="mt-2 text-xl font-bold">
+                  {strings.simpleWrongPin}
+                </p>
+              )}
               <MaskedPinInput
                 id={`${ids}-pin`}
                 value={pin}
@@ -154,16 +164,24 @@ export function SimpleModeView({
                 className="reader-surface mt-3 min-h-[64px] w-full rounded-sm border px-4 text-2xl tracking-widest"
               />
               <div className="mt-5 grid gap-3">
-                <button type="submit" className={`primary-cta ${big}`}>{strings.simpleUnlockWithPin}</button>
-                <button type="button" className={`surface-button border ${big}`} onClick={closeUnlock}>{strings.simpleUnlockCancel}</button>
+                <button type="submit" className={`primary-cta ${big}`}>
+                  {strings.simpleUnlockWithPin}
+                </button>
+                <button type="button" className={`surface-button border ${big}`} onClick={closeUnlock}>
+                  {strings.simpleUnlockCancel}
+                </button>
               </div>
             </form>
           ) : (
             <div className="mt-4">
               <p className="text-xl">{strings.simpleUnlockNoPin}</p>
               <div className="mt-5 grid gap-3">
-                <button type="button" className={`surface-button border ${big}`} onClick={closeUnlock}>{strings.simpleUnlockCancel}</button>
-                <button type="button" className={`surface-button border ${big}`} onClick={tryUnlock}>{strings.simpleUnlockConfirm}</button>
+                <button type="button" className={`surface-button border ${big}`} onClick={closeUnlock}>
+                  {strings.simpleUnlockCancel}
+                </button>
+                <button type="button" className={`surface-button border ${big}`} onClick={tryUnlock}>
+                  {strings.simpleUnlockConfirm}
+                </button>
               </div>
             </div>
           )}
@@ -180,7 +198,9 @@ export function SimpleModeView({
           >
             {strings.simpleTakePhoto}
           </button>
-          <p id={`${ids}-hint`} className="sr-only">{strings.simpleTakePhotoHint}</p>
+          <p id={`${ids}-hint`} className="sr-only">
+            {strings.simpleTakePhotoHint}
+          </p>
 
           {/* Spoken status: Describing, Description ready, errors, offline. Never the description itself. */}
           <div role="status" aria-live="polite" aria-atomic="true" className="text-xl font-bold">
@@ -189,14 +209,18 @@ export function SimpleModeView({
 
           {descriptionText && (
             <section aria-labelledby={`${ids}-description`} className="reader-surface rounded-sm border p-5">
-              <h2 id={`${ids}-description`} className="text-2xl font-bold">{strings.readerHeading}</h2>
+              <h2 id={`${ids}-description`} className="text-2xl font-bold">
+                {strings.readerHeading}
+              </h2>
               <p className="mt-3 whitespace-pre-wrap text-xl leading-relaxed">{descriptionText}</p>
             </section>
           )}
 
           {descriptionText && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <button type="button" className={`surface-button border ${big}`} onClick={onRepeat}>{strings.simpleRepeat}</button>
+              <button type="button" className={`surface-button border ${big}`} onClick={onRepeat}>
+                {strings.simpleRepeat}
+              </button>
               {speaking && (
                 <button type="button" className={`surface-button border ${big}`} onClick={onTogglePause}>
                   {speechStatus.paused ? strings.simpleResume : strings.simplePause}
@@ -207,11 +231,19 @@ export function SimpleModeView({
 
           <div className="mt-auto grid gap-3 pt-6">
             {needRefresh && (
-              <button type="button" className="update-button min-h-[56px] rounded-sm px-6 py-3 text-lg font-bold" onClick={onUpdateApp}>
+              <button
+                type="button"
+                className="update-button min-h-[56px] rounded-sm px-6 py-3 text-lg font-bold"
+                onClick={onUpdateApp}
+              >
                 {strings.update}
               </button>
             )}
-            <button type="button" className="surface-button min-h-[56px] rounded-sm border px-6 py-3 text-lg font-bold" onClick={() => setUnlocking(true)}>
+            <button
+              type="button"
+              className="surface-button min-h-[56px] rounded-sm border px-6 py-3 text-lg font-bold"
+              onClick={() => setUnlocking(true)}
+            >
               {strings.simpleSettings}
             </button>
           </div>

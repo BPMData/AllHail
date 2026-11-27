@@ -1,12 +1,4 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 export const PIPER_VOICE_ID = 'en_US-hfc_female-medium';
@@ -14,17 +6,11 @@ export const PIPER_MODEL_BYTES = 63_201_294;
 export const PIPER_CONFIG_BYTES = 5_000;
 
 // Ship one ONNX WASM variant only: it handles both WebGPU (Kokoro) and plain WASM (Piper).
-export const ORT_RUNTIME_FILES = [
-  'ort-wasm-simd-threaded.jsep.mjs',
-  'ort-wasm-simd-threaded.jsep.wasm',
-];
+export const ORT_RUNTIME_FILES = ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm'];
 
 export const PIPER_ORT_RUNTIME_FILES = [...ORT_RUNTIME_FILES];
 
-export const PIPER_PHONEMIZE_FILES = [
-  'piper_phonemize.wasm',
-  'piper_phonemize.data',
-];
+export const PIPER_PHONEMIZE_FILES = ['piper_phonemize.wasm', 'piper_phonemize.data'];
 
 export function copySelfHostedRuntimesToDist(rootDir = process.cwd()) {
   const ortSrcDir = resolve(rootDir, 'node_modules/onnxruntime-web/dist');
@@ -163,7 +149,7 @@ export function verifySingleOnnxRuntime(rootDir = process.cwd(), { checkDist = t
   const pkgVersions = [...new Set(pkgEntries.map((entry) => entry.version))];
   if (pkgVersions.length !== 1) {
     throw new Error(
-      `Expected exactly one onnxruntime-web version in node_modules, found ${pkgVersions.length}: ${JSON.stringify(pkgEntries)}`,
+      `Expected exactly one onnxruntime-web version in node_modules, found ${pkgVersions.length}: ${JSON.stringify(pkgEntries)}`
     );
   }
 
@@ -175,7 +161,7 @@ export function verifySingleOnnxRuntime(rootDir = process.cwd(), { checkDist = t
     const foreignVersions = distVersions.filter((v) => v !== pkgVersions[0]);
     if (foreignVersions.length > 0) {
       throw new Error(
-        `Multiple or mismatched onnxruntime-web versions found in dist/: expected ${pkgVersions[0]}, also found ${foreignVersions.join(', ')}`,
+        `Multiple or mismatched onnxruntime-web versions found in dist/: expected ${pkgVersions[0]}, also found ${foreignVersions.join(', ')}`
       );
     }
   }
@@ -203,7 +189,7 @@ export function verifyDistRuntimeAssets(rootDir = process.cwd()) {
     actualOrtFiles.some((file, index) => file !== expectedOrtFiles[index])
   ) {
     throw new Error(
-      `Expected dist/ort to contain only ${expectedOrtFiles.join(', ')}, found: ${actualOrtFiles.join(', ')}`,
+      `Expected dist/ort to contain only ${expectedOrtFiles.join(', ')}, found: ${actualOrtFiles.join(', ')}`
     );
   }
 
@@ -217,13 +203,9 @@ export function verifyDistRuntimeAssets(rootDir = process.cwd()) {
   }
 
   if (existsSync(assetsDir)) {
-    const duplicateOrtAssets = readdirSync(assetsDir).filter((file) =>
-      /^ort-wasm.*\.(?:wasm|mjs)$/i.test(file),
-    );
+    const duplicateOrtAssets = readdirSync(assetsDir).filter((file) => /^ort-wasm.*\.(?:wasm|mjs)$/i.test(file));
     if (duplicateOrtAssets.length > 0) {
-      throw new Error(
-        `Found duplicate ONNX WASM assets in dist/assets/: ${duplicateOrtAssets.join(', ')}`,
-      );
+      throw new Error(`Found duplicate ONNX WASM assets in dist/assets/: ${duplicateOrtAssets.join(', ')}`);
     }
   }
 

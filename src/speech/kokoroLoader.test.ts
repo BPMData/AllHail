@@ -114,7 +114,7 @@ describe('loadKokoroWebGpu (WebGPU fp32 only, no WASM fallback)', () => {
         loadModel,
         onStageStart,
         onProgress: vi.fn(),
-      }),
+      })
     ).rejects.toThrow(/WebGPU adapter unavailable/);
 
     expect(loadModel).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('loadKokoroWebGpu (WebGPU fp32 only, no WASM fallback)', () => {
         loadModel: loadSilent,
         onStageStart: vi.fn(),
         onProgress: vi.fn(),
-      }),
+      })
     ).rejects.toThrow(/silent or invalid PCM/);
     expect(loadSilent).toHaveBeenCalledTimes(1);
 

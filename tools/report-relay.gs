@@ -34,8 +34,12 @@ var APP_URL = 'https://bpmdata.github.io/allhail';
 var EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 var CATEGORIES = {
-  camera: 'Taking or choosing a photo', descriptions: 'Photo descriptions', speech: 'Speech, voices or MP3',
-  offline: 'Offline use, installing or updating', history: 'Saved history', access: 'Screen reader, keyboard or text size',
+  camera: 'Taking or choosing a photo',
+  descriptions: 'Photo descriptions',
+  speech: 'Speech, voices or MP3',
+  offline: 'Offline use, installing or updating',
+  history: 'Saved history',
+  access: 'Screen reader, keyboard or text size',
   other: 'Something else',
 };
 
@@ -54,24 +58,45 @@ function doPost(e) {
     if (!underLimit()) return reply({ ok: false, error: 'busy' });
 
     var priv = r['private'] || {};
-    var issue = null, issueError = '';
-    try { issue = openIssue(r, props); } catch (err) { issueError = String(err).slice(0, 500); }
+    var issue = null,
+      issueError = '';
+    try {
+      issue = openIssue(r, props);
+    } catch (err) {
+      issueError = String(err).slice(0, 500);
+    }
     emailReport(r, priv, issue, issueError, props);
     var email = String(priv.email || '').trim();
     var thanked = false;
     if (EMAIL_RE.test(email)) {
       if (mayThank(email)) {
-        try { thankYou(email, issue); thanked = true; } catch (err) { Logger.log('thank-you failed: ' + err); }
+        try {
+          thankYou(email, issue);
+          thanked = true;
+        } catch (err) {
+          Logger.log('thank-you failed: ' + err);
+        }
       }
-      if (issue) props.setProperty('contact:' + issue.number, JSON.stringify({ email: email, category: r['public'].category, at: Date.now() }));
+      if (issue)
+        props.setProperty(
+          'contact:' + issue.number,
+          JSON.stringify({ email: email, category: r['public'].category, at: Date.now() })
+        );
     }
-    return reply({ ok: true, issue: issue ? issue.number : null, url: issue ? issue.html_url : null, thanked: thanked });
+    return reply({
+      ok: true,
+      issue: issue ? issue.number : null,
+      url: issue ? issue.html_url : null,
+      thanked: thanked,
+    });
   } catch (err) {
     return reply({ ok: false, error: String(err).slice(0, 200) });
   }
 }
 
-function doGet() { return reply({ ok: true, hello: 'AllHail report relay' }); }
+function doGet() {
+  return reply({ ok: true, hello: 'AllHail report relay' });
+}
 
 function reply(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
@@ -80,12 +105,17 @@ function reply(o) {
 function withLock(fn) {
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  try { return fn(); } finally { lock.releaseLock(); }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function underLimit() {
   return withLock(function () {
-    var cache = CacheService.getScriptCache(), key = 'sent-' + Math.floor(Date.now() / 3600000);
+    var cache = CacheService.getScriptCache(),
+      key = 'sent-' + Math.floor(Date.now() / 3600000);
     var n = Number(cache.get(key) || 0);
     if (n >= MAX_PER_HOUR) return false;
     if (!countToday('reports', MAX_PER_DAY)) return false;
@@ -96,15 +126,21 @@ function underLimit() {
 
 /* Daily counts live in Script properties as day:2026-11-24 = {"reports":3,"thanks":1}. Call inside withLock. */
 function countToday(kind, max) {
-  var props = PropertiesService.getScriptProperties(), key = 'day:' + today(), c = {};
-  try { c = JSON.parse(props.getProperty(key) || '{}'); } catch (e) {}
+  var props = PropertiesService.getScriptProperties(),
+    key = 'day:' + today(),
+    c = {};
+  try {
+    c = JSON.parse(props.getProperty(key) || '{}');
+  } catch (e) {}
   if ((c[kind] || 0) >= max) return false;
   c[kind] = (c[kind] || 0) + 1;
   props.setProperty(key, JSON.stringify(c));
   return true;
 }
 
-function today() { return Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd'); }
+function today() {
+  return Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
+}
 
 function mayThank(email) {
   var key = 'thanked:' + emailHash(email);
@@ -119,24 +155,40 @@ function mayThank(email) {
 
 function emailHash(email) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email.toLowerCase())
-    .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('').slice(0, 32);
+    .map(function (b) {
+      return ('0' + (b & 255).toString(16)).slice(-2);
+    })
+    .join('')
+    .slice(0, 32);
 }
 
 /* ---------- plain words ---------- */
 /* anything going into the public issue is kept plain (no links, @mentions, HTML or markdown tricks) */
 function clean(s, n) {
-  return String(s === undefined || s === null ? '' : s).replace(/[<>@`*_\[\]|#\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n || 160);
+  return String(s === undefined || s === null ? '' : s)
+    .replace(/[<>@`*_\[\]|#\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, n || 160);
 }
-function category(r) { return CATEGORIES[r['public'].category] || 'Something else'; }
+function category(r) {
+  return CATEGORIES[r['public'].category] || 'Something else';
+}
 function system(r) {
   var d = r['public'].diagnostics || {};
   return clean(d.os || 'unknown system', 60) + ' · ' + clean(d.browser || 'unknown browser', 60);
 }
 function summary(r) {
-  var p = r['public'], d = p.diagnostics || {};
+  var p = r['public'],
+    d = p.diagnostics || {};
   var lines = [
     '**What went wrong:** ' + category(r),
-    '**What fits:** ' + ((p.symptoms || []).map(function (x) { return clean(x, 40); }).join(', ') || 'nothing ticked'),
+    '**What fits:** ' +
+      ((p.symptoms || [])
+        .map(function (x) {
+          return clean(x, 40);
+        })
+        .join(', ') || 'nothing ticked'),
     '**AllHail:** ' + clean(d.appVersion || '?', 20) + ' (built ' + clean(d.appBuilt || '?', 20) + ')',
     '**System:** ' + system(r) + ' · ' + clean(d.deviceClass || '?', 20),
     '',
@@ -153,25 +205,38 @@ function summary(r) {
 
 /* ---------- GitHub ---------- */
 function openIssue(r, props) {
-  var token = props.getProperty('GITHUB_TOKEN'), repo = props.getProperty('GITHUB_REPO') || 'BPMData/allhail';
+  var token = props.getProperty('GITHUB_TOKEN'),
+    repo = props.getProperty('GITHUB_REPO') || 'BPMData/allhail';
   if (!token) throw new Error('GITHUB_TOKEN is not set');
   var title = ('Problem report: ' + category(r) + ' · ' + system(r)).slice(0, 200);
-  var body = summary(r) + '\n\n<sub>Sent from AllHail\'s "Something not working?" page. The person\'s own words and email, if any, went to the private reports inbox only.</sub>';
+  var body =
+    summary(r) +
+    '\n\n<sub>Sent from AllHail\'s "Something not working?" page. The person\'s own words and email, if any, went to the private reports inbox only.</sub>';
   var res = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + '/issues', {
-    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: {
+      Authorization: 'Bearer ' + token,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
     payload: JSON.stringify({ title: title, body: body, labels: [LABEL] }),
   });
-  if (res.getResponseCode() !== 201) throw new Error('GitHub said ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  if (res.getResponseCode() !== 201)
+    throw new Error('GitHub said ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
   return JSON.parse(res.getContentText());
 }
 
 /* ---------- email ---------- */
 function emailReport(r, priv, issue, issueError, props) {
   var to = props.getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail();
-  var email = String(priv.email || '').trim(), okEmail = EMAIL_RE.test(email);
+  var email = String(priv.email || '').trim(),
+    okEmail = EMAIL_RE.test(email);
   var text = [
-    issue ? 'GitHub issue: ' + issue.html_url : 'The GitHub issue could not be made: ' + (issueError || 'unknown reason'),
+    issue
+      ? 'GitHub issue: ' + issue.html_url
+      : 'The GitHub issue could not be made: ' + (issueError || 'unknown reason'),
     '',
     'Their email: ' + (email || '(none given)') + (okEmail ? '  (Reply to this message to answer them.)' : ''),
     'What happened: ' + (priv.details ? '\n' + String(priv.details).slice(0, 4000) : '(not given)'),
@@ -181,38 +246,57 @@ function emailReport(r, priv, issue, issueError, props) {
     '',
     'The full report is attached.',
   ].join('\n');
-  var opts = { to: to, subject: 'AllHail problem report: ' + category(r) + ' · ' + system(r), body: text,
-    attachments: [Utilities.newBlob(JSON.stringify(r, null, 1), 'application/json', 'AllHail-problem-report.json')] };
+  var opts = {
+    to: to,
+    subject: 'AllHail problem report: ' + category(r) + ' · ' + system(r),
+    body: text,
+    attachments: [Utilities.newBlob(JSON.stringify(r, null, 1), 'application/json', 'AllHail-problem-report.json')],
+  };
   if (okEmail) opts.replyTo = email;
   MailApp.sendEmail(opts);
 }
 
 /* ---------- emails to the person ---------- */
 function thankYou(email, issue) {
-  MailApp.sendEmail({ to: email, name: 'AllHail', subject: 'We got your AllHail report', body: [
-    'Hi,',
-    '',
-    'Thank you for telling us what went wrong in AllHail. Your report arrived safely.',
-    '',
-    'What happens next: we will look into it. When there is a fix, you will get one more email from this address saying how to get it. Nothing else will be sent to you.',
-    issue ? '\nYou can follow your report here (no sign-in needed): ' + issue.html_url + '\n' : '',
-    'Thanks again,',
-    'AllHail',
-  ].join('\n') });
+  MailApp.sendEmail({
+    to: email,
+    name: 'AllHail',
+    subject: 'We got your AllHail report',
+    body: [
+      'Hi,',
+      '',
+      'Thank you for telling us what went wrong in AllHail. Your report arrived safely.',
+      '',
+      'What happens next: we will look into it. When there is a fix, you will get one more email from this address saying how to get it. Nothing else will be sent to you.',
+      issue ? '\nYou can follow your report here (no sign-in needed): ' + issue.html_url + '\n' : '',
+      'Thanks again,',
+      'AllHail',
+    ].join('\n'),
+  });
 }
 
 /* Run once a day (installDailyCheck). Tells each person whose report was closed as fixed, then forgets them. */
 function checkForFixes() {
-  var props = PropertiesService.getScriptProperties(), all = props.getProperties();
+  var props = PropertiesService.getScriptProperties(),
+    all = props.getProperties();
   Object.keys(all).forEach(function (key) {
-    if (key.indexOf('day:') === 0) { if (key !== 'day:' + today()) props.deleteProperty(key); return; }
+    if (key.indexOf('day:') === 0) {
+      if (key !== 'day:' + today()) props.deleteProperty(key);
+      return;
+    }
     if (key.indexOf('thanked:') === 0) {
       if (Date.now() - Number(all[key]) >= THANK_AGAIN_DAYS * 864e5) props.deleteProperty(key);
       return;
     }
     if (key.indexOf('contact:') !== 0) return;
-    var n = key.slice(8), contact;
-    try { contact = JSON.parse(all[key]); } catch (e) { props.deleteProperty(key); return; }
+    var n = key.slice(8),
+      contact;
+    try {
+      contact = JSON.parse(all[key]);
+    } catch (e) {
+      props.deleteProperty(key);
+      return;
+    }
     try {
       var issue = github('/issues/' + n);
       if (issue.state !== 'closed') {
@@ -228,53 +312,75 @@ function checkForFixes() {
 }
 
 function sendFollowUp(email, issue) {
-  MailApp.sendEmail({ to: email, name: 'AllHail', subject: 'AllHail: a fix for the problem you reported', body: [
-    'Hi,',
-    '',
-    'A while ago you sent a report from AllHail\'s "Something not working?" page. Thank you again.',
-    '',
-    'We have made a change to AllHail that should help with the problem you reported.',
-    '',
-    'How to make sure you have the new version:',
-    '1. Open AllHail: ' + APP_URL,
-    '2. If it says "A new version of AllHail is ready", choose Update AllHail.',
-    '3. If you installed AllHail as an app, close it fully and open it again.',
-    '',
-    'If it still does not work, please send another report from "Something not working?". Every report helps.',
-    '',
-    'Your report: ' + issue.html_url,
-    'This is the last email you will get about this report.',
-    '',
-    'AllHail',
-  ].join('\n') });
+  MailApp.sendEmail({
+    to: email,
+    name: 'AllHail',
+    subject: 'AllHail: a fix for the problem you reported',
+    body: [
+      'Hi,',
+      '',
+      'A while ago you sent a report from AllHail\'s "Something not working?" page. Thank you again.',
+      '',
+      'We have made a change to AllHail that should help with the problem you reported.',
+      '',
+      'How to make sure you have the new version:',
+      '1. Open AllHail: ' + APP_URL,
+      '2. If it says "A new version of AllHail is ready", choose Update AllHail.',
+      '3. If you installed AllHail as an app, close it fully and open it again.',
+      '',
+      'If it still does not work, please send another report from "Something not working?". Every report helps.',
+      '',
+      'Your report: ' + issue.html_url,
+      'This is the last email you will get about this report.',
+      '',
+      'AllHail',
+    ].join('\n'),
+  });
 }
 
 function github(path) {
   var props = PropertiesService.getScriptProperties();
   var repo = props.getProperty('GITHUB_REPO') || 'BPMData/allhail';
-  var res = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + path, { muteHttpExceptions: true,
-    headers: { Authorization: 'Bearer ' + props.getProperty('GITHUB_TOKEN'), Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
+  var res = UrlFetchApp.fetch('https://api.github.com/repos/' + repo + path, {
+    muteHttpExceptions: true,
+    headers: {
+      Authorization: 'Bearer ' + props.getProperty('GITHUB_TOKEN'),
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  });
   if (res.getResponseCode() !== 200) throw new Error('GitHub said ' + res.getResponseCode() + ' for ' + path);
   return JSON.parse(res.getContentText());
 }
 
 /* ---------- run these once from the editor (▶ Run) ---------- */
 function installDailyCheck() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'checkForFixes') ScriptApp.deleteTrigger(t); });
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'checkForFixes') ScriptApp.deleteTrigger(t);
+  });
   ScriptApp.newTrigger('checkForFixes').timeBased().everyDays(1).atHour(15).create();
   Logger.log('checkForFixes will run once a day.');
 }
 
 function checkSetup() {
   var props = PropertiesService.getScriptProperties();
-  var token = props.getProperty('GITHUB_TOKEN'), repo = props.getProperty('GITHUB_REPO') || 'BPMData/allhail';
+  var token = props.getProperty('GITHUB_TOKEN'),
+    repo = props.getProperty('GITHUB_REPO') || 'BPMData/allhail';
   if (!token) throw new Error('Add GITHUB_TOKEN under Project Settings ▸ Script properties first.');
-  if (!props.getProperty('RELAY_SECRET')) throw new Error('Add RELAY_SECRET under Project Settings ▸ Script properties first.');
-  var res = UrlFetchApp.fetch('https://api.github.com/repos/' + repo, { muteHttpExceptions: true,
-    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } });
-  if (res.getResponseCode() !== 200) throw new Error('GitHub token problem (' + res.getResponseCode() + '): ' + res.getContentText().slice(0, 200));
+  if (!props.getProperty('RELAY_SECRET'))
+    throw new Error('Add RELAY_SECRET under Project Settings ▸ Script properties first.');
+  var res = UrlFetchApp.fetch('https://api.github.com/repos/' + repo, {
+    muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+  });
+  if (res.getResponseCode() !== 200)
+    throw new Error('GitHub token problem (' + res.getResponseCode() + '): ' + res.getContentText().slice(0, 200));
   Logger.log('GitHub token works for ' + repo);
   var to = props.getProperty('NOTIFY_EMAIL') || Session.getEffectiveUser().getEmail();
-  MailApp.sendEmail(to, 'AllHail relay: setup check', 'If you can read this, the AllHail relay can email you. Next: Deploy ▸ New deployment (see docs/REPORTS.md).');
+  MailApp.sendEmail(
+    to,
+    'AllHail relay: setup check',
+    'If you can read this, the AllHail relay can email you. Next: Deploy ▸ New deployment (see docs/REPORTS.md).'
+  );
   Logger.log('Sent a test email to ' + to + '. All set.');
 }

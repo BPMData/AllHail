@@ -12,7 +12,8 @@ import {
 import { strings } from './shared/strings.ts';
 
 const initialPiperSize = measurePiperDownloadSize(process.cwd());
-const appVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version;
+const appVersion = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string })
+  .version;
 
 function dedupeSelfHostedOnnxWasm() {
   return {
@@ -80,11 +81,12 @@ export default defineConfig({
       name: 'allhail-html-strings',
       transformIndexHtml: {
         order: 'pre',
-        handler: (html) => html
-          .replaceAll('%APP_LANGUAGE%', strings.language)
-          .replaceAll('%APP_NAME%', strings.appName)
-          .replaceAll('%APP_DESCRIPTION%', strings.description)
-          .replaceAll('%APP_NO_SCRIPT%', strings.noScript),
+        handler: (html) =>
+          html
+            .replaceAll('%APP_LANGUAGE%', strings.language)
+            .replaceAll('%APP_NAME%', strings.appName)
+            .replaceAll('%APP_DESCRIPTION%', strings.description)
+            .replaceAll('%APP_NO_SCRIPT%', strings.noScript),
       },
     },
     VitePWA({
@@ -118,8 +120,7 @@ export default defineConfig({
         // Cache self-hosted /ort/ and /piper/ files strictly on demand, never on initial install.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith('/piper/') || url.pathname.startsWith('/ort/'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/piper/') || url.pathname.startsWith('/ort/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'allhail-piper-runtime',

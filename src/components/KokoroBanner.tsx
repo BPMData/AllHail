@@ -18,12 +18,7 @@ export function formatElapsed(totalSeconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-export function KokoroBanner({
-  kokoroState,
-  piperState,
-  onRetry,
-  onRetryPiper,
-}: KokoroBannerProps) {
+export function KokoroBanner({ kokoroState, piperState, onRetry, onRetryPiper }: KokoroBannerProps) {
   const [now, setNow] = useState(() => Date.now());
 
   const activeDownload =
@@ -36,9 +31,7 @@ export function KokoroBanner({
   const activeError =
     activeDownload === null && piperState?.status === 'error'
       ? ({ kind: 'piper', onRetry: onRetryPiper ?? onRetry } as const)
-      : activeDownload === null &&
-          kokoroState.status === 'error' &&
-          (!piperState || piperState.status === 'idle')
+      : activeDownload === null && kokoroState.status === 'error' && (!piperState || piperState.status === 'idle')
         ? ({ kind: 'kokoro', onRetry } as const)
         : null;
 
@@ -88,8 +81,7 @@ export function KokoroBanner({
       : activeDownload!.state.cached
         ? strings.kokoroCachedBannerTitle
         : strings.kokoroBannerTitle;
-  const progressLabel =
-    activeDownload!.kind === 'piper' ? strings.piperProgressLabel : strings.kokoroProgressLabel;
+  const progressLabel = activeDownload!.kind === 'piper' ? strings.piperProgressLabel : strings.kokoroProgressLabel;
 
   return (
     <section

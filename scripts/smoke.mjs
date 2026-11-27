@@ -21,8 +21,11 @@ try {
     assert.match(response.headers.get('content-type'), /application\/json/);
   }
   // With no relay configured, problem reports answer in JSON so the page can offer the email fallback.
-  const postReport = (body) => fetch(`${base}/api/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
-  const unconfigured = await postReport(JSON.stringify({ app: 'AllHail', kind: 'problem-report', public: { category: 'other' }, private: {} }));
+  const postReport = (body) =>
+    fetch(`${base}/api/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+  const unconfigured = await postReport(
+    JSON.stringify({ app: 'AllHail', kind: 'problem-report', public: { category: 'other' }, private: {} })
+  );
   assert.equal(unconfigured.status, 503);
   assert.equal((await unconfigured.json()).error, 'reports_unavailable');
   const broken = await postReport('{not json');
@@ -65,5 +68,5 @@ try {
   assert.match(worker.headers.get('content-type'), /javascript/);
   console.log('Production smoke test passed: routes, assets, manifest, icons and worker.');
 } finally {
-  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }

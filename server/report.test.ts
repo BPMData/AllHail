@@ -12,9 +12,19 @@ const goodReport = {
   public: {
     category: 'speech',
     symptoms: ['nothing-read', 'not-a-real-symptom'],
-    diagnostics: { appVersion: '0.1.0', os: 'Android 15', browser: 'Chrome 131', photoData: 'data:image/jpeg;base64,AAAA', speaking: false },
+    diagnostics: {
+      appVersion: '0.1.0',
+      os: 'Android 15',
+      browser: 'Chrome 131',
+      photoData: 'data:image/jpeg;base64,AAAA',
+      speaking: false,
+    },
   },
-  private: { details: 'It went quiet after the photo of Ms. Rivera\'s worksheet.', steps: '', email: 'teacher@example.org' },
+  private: {
+    details: "It went quiet after the photo of Ms. Rivera's worksheet.",
+    steps: '',
+    email: 'teacher@example.org',
+  },
   website: '',
 };
 
@@ -32,11 +42,17 @@ async function start(reportDeps: ReportDeps) {
   await once(server, 'listening');
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return (body: unknown) =>
-    fetch(`${base}/api/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    fetch(`${base}/api/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 }
 
 function relayReturning(reply: unknown, status = 200) {
-  return vi.fn<typeof fetch>(async () => new Response(JSON.stringify(reply), { status, headers: { 'Content-Type': 'application/json' } }));
+  return vi.fn<typeof fetch>(
+    async () => new Response(JSON.stringify(reply), { status, headers: { 'Content-Type': 'application/json' } })
+  );
 }
 
 const configured = (fetchFn: typeof fetch): ReportDeps => ({
@@ -60,7 +76,12 @@ describe('POST /api/report', () => {
     const sent = JSON.parse(String(init?.body));
     expect(sent.secret).toBe('shh');
     expect(sent.public.symptoms).toEqual(['nothing-read']);
-    expect(sent.public.diagnostics).toEqual({ appVersion: '0.1.0', os: 'Android 15', browser: 'Chrome 131', speaking: false });
+    expect(sent.public.diagnostics).toEqual({
+      appVersion: '0.1.0',
+      os: 'Android 15',
+      browser: 'Chrome 131',
+      speaking: false,
+    });
     expect(sent.private.email).toBe('teacher@example.org');
     expect(sent).not.toHaveProperty('website');
   });
@@ -97,7 +118,13 @@ describe('POST /api/report', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const refused = await start(configured(relayReturning({ ok: false, error: 'busy' })));
     expect((await refused(goodReport)).status).toBe(502);
-    const down = await start(configured(vi.fn<typeof fetch>(async () => { throw new TypeError('network down'); })));
+    const down = await start(
+      configured(
+        vi.fn<typeof fetch>(async () => {
+          throw new TypeError('network down');
+        })
+      )
+    );
     expect((await down(goodReport)).status).toBe(502);
     // Logs never include what the person wrote.
     const logged = warn.mock.calls.flat().join(' ');
@@ -106,7 +133,10 @@ describe('POST /api/report', () => {
   });
 
   it('limits how many reports one address can send', async () => {
-    const post = await start({ ...configured(relayReturning({ ok: true })), rateLimiter: createRateLimiter({ maxRequests: 1, windowMs: 60_000 }) });
+    const post = await start({
+      ...configured(relayReturning({ ok: true })),
+      rateLimiter: createRateLimiter({ maxRequests: 1, windowMs: 60_000 }),
+    });
     expect((await post(goodReport)).status).toBe(200);
     const second = await post(goodReport);
     expect(second.status).toBe(429);

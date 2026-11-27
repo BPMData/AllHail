@@ -57,26 +57,42 @@ function apiKey(): string {
     const line = readFileSync(envFile, 'utf8')
       .split('\n')
       .find((l) => l.startsWith('OPENROUTER_API_KEY='));
-    if (line) return line.slice('OPENROUTER_API_KEY='.length).replace(/^["']|["']$/g, '').trim();
+    if (line)
+      return line
+        .slice('OPENROUTER_API_KEY='.length)
+        .replace(/^["']|["']$/g, '')
+        .trim();
   }
   throw new Error('Set OPENROUTER_API_KEY (environment or .env at the repo root).');
 }
 
 const MIME: Record<string, string> = {
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-  '.webp': 'image/webp', '.heic': 'image/heic',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.heic': 'image/heic',
 };
 
 /** Turn upright, shrink to MAX_SIDE and strip ALL metadata (GPS included), as the app will.
  *  If that fails the photo is not sent at all: never upload an original that may carry GPS. */
 function loadPhoto(path: string): { dataUrl: string; bytes: number } {
   const out = join(tmpdir(), `bakeoff-${basename(path)}.jpg`);
-  execFileSync('python3', ['-I', join(HERE, 'shrink.py'), path, out, String(MAX_SIDE)], { stdio: ['ignore', 'ignore', 'inherit'] });
+  execFileSync('python3', ['-I', join(HERE, 'shrink.py'), path, out, String(MAX_SIDE)], {
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
   const buf = readFileSync(out);
   return { dataUrl: `data:image/jpeg;base64,${buf.toString('base64')}`, bytes: buf.length };
 }
 
-async function ask(key: string, model: string, prompts: Prompts, prompt: PromptName, dataUrl: string, noThinking: boolean): Promise<Omit<Result, 'model' | 'modelId' | 'variant' | 'retried' | 'photo' | 'prompt'>> {
+async function ask(
+  key: string,
+  model: string,
+  prompts: Prompts,
+  prompt: PromptName,
+  dataUrl: string,
+  noThinking: boolean
+): Promise<Omit<Result, 'model' | 'modelId' | 'variant' | 'retried' | 'photo' | 'prompt'>> {
   const started = performance.now();
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -112,7 +128,14 @@ async function ask(key: string, model: string, prompts: Prompts, prompt: PromptN
     const ms = Math.round(performance.now() - started);
     const body = (await res.json()) as any;
     if (!res.ok || body.error) {
-      return { ms, promptTokens: null, completionTokens: null, cost: null, text: '', error: `${res.status}: ${body.error?.message ?? JSON.stringify(body).slice(0, 300)}` };
+      return {
+        ms,
+        promptTokens: null,
+        completionTokens: null,
+        cost: null,
+        text: '',
+        error: `${res.status}: ${body.error?.message ?? JSON.stringify(body).slice(0, 300)}`,
+      };
     }
     const text: string = body.choices?.[0]?.message?.content ?? '';
     return {
@@ -124,7 +147,14 @@ async function ask(key: string, model: string, prompts: Prompts, prompt: PromptN
       error: text.trim() ? null : 'Empty answer',
     };
   } catch (e) {
-    return { ms: Math.round(performance.now() - started), promptTokens: null, completionTokens: null, cost: null, text: '', error: String((e as Error).message ?? e) };
+    return {
+      ms: Math.round(performance.now() - started),
+      promptTokens: null,
+      completionTokens: null,
+      cost: null,
+      text: '',
+      error: String((e as Error).message ?? e),
+    };
   }
 }
 
@@ -148,7 +178,8 @@ async function main() {
   const modelFile = resolve(arg('models') ?? join(HERE, 'models.txt'));
   const prompts = (arg('prompts') ?? 'describe,detail').split(',') as PromptName[];
   const variants = (arg('variants') ?? CURRENT).split(',').map((v) => v.trim());
-  for (const v of variants) if (!VARIANTS[v]) throw new Error(`Unknown prompt version "${v}". Have: ${Object.keys(VARIANTS).join(', ')}`);
+  for (const v of variants)
+    if (!VARIANTS[v]) throw new Error(`Unknown prompt version "${v}". Have: ${Object.keys(VARIANTS).join(', ')}`);
   for (const p of prompts) if (!PROMPTS[p]) throw new Error(`Unknown prompt "${p}". Use describe and/or detail.`);
 
   // A line is "<model id>" or "<model id> no-thinking".
@@ -162,7 +193,9 @@ async function main() {
   if (only) models = only.split(',').map((m) => m.trim());
 
   // --only-photos a.jpg,b.jpg: test just these photos from the folder.
-  const onlyPhotos = arg('only-photos')?.split(',').map((f) => f.trim());
+  const onlyPhotos = arg('only-photos')
+    ?.split(',')
+    .map((f) => f.trim());
   const photos = readdirSync(photoDir)
     .filter((f) => MIME[extname(f).toLowerCase()])
     .filter((f) => !onlyPhotos || onlyPhotos.includes(f))
@@ -172,7 +205,6 @@ async function main() {
     throw new Error(`Not found in ${photoDir}: ${onlyPhotos.filter((f) => !photos.includes(f)).join(', ')}`);
 
   const loaded = Object.fromEntries(photos.map((p) => [p, loadPhoto(join(photoDir, p))]));
-
 
   const jobs: (() => Promise<Result>)[] = [];
   for (const photo of photos)
@@ -186,7 +218,9 @@ async function main() {
             const retried = r.error === 'Empty answer';
             if (retried) r = await go();
             const label = variants.length > 1 ? `${model} [${variant}]` : model;
-            const tag = r.error ? `FAILED ${r.error.slice(0, 80)}` : `${r.ms} ms, $${r.cost?.toFixed(5) ?? '?'}${retried ? ' (retried)' : ''}`;
+            const tag = r.error
+              ? `FAILED ${r.error.slice(0, 80)}`
+              : `${r.ms} ms, $${r.cost?.toFixed(5) ?? '?'}${retried ? ' (retried)' : ''}`;
             console.log(`  ${photo} · ${prompt} · ${label}: ${tag}`);
             return { model: label, modelId: model, variant, retried, photo, prompt, ...r };
           });
@@ -205,7 +239,10 @@ async function main() {
   const fullSize = Object.fromEntries(
     photos.map((p) => [p, relative(outDir, join(photoDir, p)).split('/').map(encodeURIComponent).join('/')])
   );
-  writeFileSync(join(outDir, 'report.html'), renderReport({ models: labels, prompts, photos, results, thumbs, fullSize }));
+  writeFileSync(
+    join(outDir, 'report.html'),
+    renderReport({ models: labels, prompts, photos, results, thumbs, fullSize })
+  );
 
   const total = results.reduce((s, r) => s + (r.cost ?? 0), 0);
   console.log(`\nTotal cost: $${total.toFixed(4)}`);

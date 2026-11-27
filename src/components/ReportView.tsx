@@ -21,7 +21,10 @@ const NUMBERED_STEPS: readonly Step[] = ['category', 'details', 'contact', 'revi
 
 export type SendReportResult = { ok: true; issueUrl: string | null } | { ok: false; message: string };
 
-export async function sendReportToServer(report: ProblemReport, fetchFn: typeof fetch = fetch): Promise<SendReportResult> {
+export async function sendReportToServer(
+  report: ProblemReport,
+  fetchFn: typeof fetch = fetch
+): Promise<SendReportResult> {
   try {
     const response = await fetchFn('/api/report', {
       method: 'POST',
@@ -46,7 +49,12 @@ type ReportViewProps = {
   sendReport?: (report: ProblemReport) => Promise<SendReportResult>;
 };
 
-export function ReportView({ online, getDiagnostics, onClose, sendReport = (report) => sendReportToServer(report) }: ReportViewProps) {
+export function ReportView({
+  online,
+  getDiagnostics,
+  onClose,
+  sendReport = (report) => sendReportToServer(report),
+}: ReportViewProps) {
   const ids = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState<Step>('category');
@@ -75,9 +83,10 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
     : null;
 
   const stepNumber = NUMBERED_STEPS.indexOf(step) + 1;
-  const stepLabel = stepNumber > 0
-    ? strings.reportStepTemplate.replace('{n}', String(stepNumber)).replace('{total}', String(NUMBERED_STEPS.length))
-    : '';
+  const stepLabel =
+    stepNumber > 0
+      ? strings.reportStepTemplate.replace('{n}', String(stepNumber)).replace('{total}', String(NUMBERED_STEPS.length))
+      : '';
 
   const goToReview = async () => {
     setDiagnostics(await getDiagnostics());
@@ -138,37 +147,58 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
 
   const heading = (text: string) => (
     <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-bold leading-tight">
-      {stepLabel && <span className="block text-base font-bold opacity-85">{stepLabel}<span className="sr-only">: </span></span>}
+      {stepLabel && (
+        <span className="block text-base font-bold opacity-85">
+          {stepLabel}
+          <span className="sr-only">: </span>
+        </span>
+      )}
       {text}
     </h2>
   );
 
   const navButtons = (onNext: () => void, onBack?: () => void) => (
     <div className="mt-6 flex flex-wrap gap-3">
-      <button type="button" className={primary} onClick={onNext}>{strings.reportNext}</button>
-      {onBack && <button type="button" className={secondary} onClick={onBack}>{strings.reportBack}</button>}
-      <button type="button" className={secondary} onClick={onClose}>{strings.reportCancel}</button>
+      <button type="button" className={primary} onClick={onNext}>
+        {strings.reportNext}
+      </button>
+      {onBack && (
+        <button type="button" className={secondary} onClick={onBack}>
+          {strings.reportBack}
+        </button>
+      )}
+      <button type="button" className={secondary} onClick={onClose}>
+        {strings.reportCancel}
+      </button>
     </div>
   );
 
   return (
     <section aria-labelledby={`${ids}-title`} className="panel-card rounded-sm border">
       <div className="panel-header">
-        <h1 id={`${ids}-title`} className="text-3xl font-bold leading-tight">{strings.reportHeading}</h1>
+        <h1 id={`${ids}-title`} className="text-3xl font-bold leading-tight">
+          {strings.reportHeading}
+        </h1>
         {step === 'category' && <p className="mt-2 text-lg">{strings.reportIntro}</p>}
       </div>
 
       <div className="panel-body">
-        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
+        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {announcement}
+        </div>
 
         {step === 'category' && (
           <form onSubmit={(event) => event.preventDefault()}>
             {heading(strings.reportStepCategory)}
             <fieldset className="mt-4" aria-describedby={categoryError ? `${ids}-cat-error` : `${ids}-cat-hint`}>
               <legend className="sr-only">{strings.reportStepCategory}</legend>
-              <p id={`${ids}-cat-hint`} className="mb-3 text-lg">{strings.reportStepCategoryHint}</p>
+              <p id={`${ids}-cat-hint`} className="mb-3 text-lg">
+                {strings.reportStepCategoryHint}
+              </p>
               {categoryError && (
-                <p id={`${ids}-cat-error`} role="alert" className="mb-3 text-lg font-bold">{strings.reportChooseCategoryError}</p>
+                <p id={`${ids}-cat-error`} role="alert" className="mb-3 text-lg font-bold">
+                  {strings.reportChooseCategoryError}
+                </p>
               )}
               <div className="grid gap-3">
                 {REPORT_CATEGORIES.map((item) => (
@@ -214,7 +244,7 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
                         checked={symptoms.includes(symptom.id)}
                         onChange={(event) =>
                           setSymptoms((current) =>
-                            event.target.checked ? [...current, symptom.id] : current.filter((id) => id !== symptom.id),
+                            event.target.checked ? [...current, symptom.id] : current.filter((id) => id !== symptom.id)
                           )
                         }
                         className="h-6 w-6 shrink-0 accent-[#6e1d20]"
@@ -226,8 +256,12 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
               </fieldset>
             )}
             <div className="mt-5">
-              <label htmlFor={`${ids}-details`} className="block text-lg font-bold">{strings.reportDetailsLabel}</label>
-              <p id={`${ids}-details-hint`} className="text-base opacity-85">{strings.reportDetailsHint}</p>
+              <label htmlFor={`${ids}-details`} className="block text-lg font-bold">
+                {strings.reportDetailsLabel}
+              </label>
+              <p id={`${ids}-details-hint`} className="text-base opacity-85">
+                {strings.reportDetailsHint}
+              </p>
               <textarea
                 id={`${ids}-details`}
                 aria-describedby={`${ids}-details-hint`}
@@ -239,8 +273,12 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
               />
             </div>
             <div className="mt-5">
-              <label htmlFor={`${ids}-steps`} className="block text-lg font-bold">{strings.reportStepsLabel}</label>
-              <p id={`${ids}-steps-hint`} className="text-base opacity-85">{strings.reportStepsHint}</p>
+              <label htmlFor={`${ids}-steps`} className="block text-lg font-bold">
+                {strings.reportStepsLabel}
+              </label>
+              <p id={`${ids}-steps-hint`} className="text-base opacity-85">
+                {strings.reportStepsHint}
+              </p>
               <textarea
                 id={`${ids}-steps`}
                 aria-describedby={`${ids}-steps-hint`}
@@ -251,7 +289,10 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
                 className="reader-surface mt-2 w-full rounded-sm border p-3 text-lg"
               />
             </div>
-            {navButtons(() => setStep('contact'), () => setStep('category'))}
+            {navButtons(
+              () => setStep('contact'),
+              () => setStep('category')
+            )}
           </form>
         )}
 
@@ -259,10 +300,16 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
           <form onSubmit={(event) => event.preventDefault()}>
             {heading(strings.reportStepContact)}
             <div className="mt-4">
-              <label htmlFor={`${ids}-email`} className="block text-lg font-bold">{strings.reportEmailLabel}</label>
-              <p id={`${ids}-email-hint`} className="text-base opacity-85">{strings.reportEmailHint}</p>
+              <label htmlFor={`${ids}-email`} className="block text-lg font-bold">
+                {strings.reportEmailLabel}
+              </label>
+              <p id={`${ids}-email-hint`} className="text-base opacity-85">
+                {strings.reportEmailHint}
+              </p>
               {emailError && (
-                <p id={`${ids}-email-error`} role="alert" className="mt-2 text-lg font-bold">{strings.reportEmailInvalid}</p>
+                <p id={`${ids}-email-error`} role="alert" className="mt-2 text-lg font-bold">
+                  {strings.reportEmailInvalid}
+                </p>
               )}
               <input
                 id={`${ids}-email`}
@@ -284,16 +331,26 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
             <div aria-hidden="true" className="sr-only">
               <label>
                 {strings.reportHoneypotLabel}
-                <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} name="website" />
+                <input
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                  name="website"
+                />
               </label>
             </div>
-            {navButtons(() => {
-              if (email.trim() && !EMAIL_RE.test(email.trim())) {
-                setEmailError(true);
-                return;
-              }
-              void goToReview();
-            }, () => setStep('details'))}
+            {navButtons(
+              () => {
+                if (email.trim() && !EMAIL_RE.test(email.trim())) {
+                  setEmailError(true);
+                  return;
+                }
+                void goToReview();
+              },
+              () => setStep('details')
+            )}
           </form>
         )}
 
@@ -303,20 +360,26 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
             <p className="mt-3 text-lg">{strings.reportReviewIntro}</p>
 
             <section aria-labelledby={`${ids}-public`} className="mt-5 rounded-sm border p-4">
-              <h3 id={`${ids}-public`} className="text-xl font-bold">{strings.reportPublicHeading}</h3>
+              <h3 id={`${ids}-public`} className="text-xl font-bold">
+                {strings.reportPublicHeading}
+              </h3>
               <dl className="mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,16rem)_1fr]">
                 <dt className="font-bold">{strings.reportReviewCategory}</dt>
                 <dd>{categoryLabel(report.public.category)}</dd>
                 <dt className="font-bold">{strings.reportReviewSymptoms}</dt>
                 <dd>{symptomLabels(report).join('; ') || strings.reportNone}</dd>
-                {(Object.entries(report.public.diagnostics) as Array<[DiagnosticKey, string | number | boolean]>).map(([key, value]) => (
-                  <ReviewRow key={key} label={DIAGNOSTIC_LABELS[key]} value={formatDiagnosticValue(value)} />
-                ))}
+                {(Object.entries(report.public.diagnostics) as Array<[DiagnosticKey, string | number | boolean]>).map(
+                  ([key, value]) => (
+                    <ReviewRow key={key} label={DIAGNOSTIC_LABELS[key]} value={formatDiagnosticValue(value)} />
+                  )
+                )}
               </dl>
             </section>
 
             <section aria-labelledby={`${ids}-private`} className="mt-5 rounded-sm border p-4">
-              <h3 id={`${ids}-private`} className="text-xl font-bold">{strings.reportPrivateHeading}</h3>
+              <h3 id={`${ids}-private`} className="text-xl font-bold">
+                {strings.reportPrivateHeading}
+              </h3>
               <dl className="mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,16rem)_1fr]">
                 <ReviewRow label={strings.reportDetailsLabel} value={report.private.details || strings.reportNone} />
                 <ReviewRow label={strings.reportStepsLabel} value={report.private.steps || strings.reportNone} />
@@ -327,14 +390,24 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
             <details className="mt-5">
               <summary className="cursor-pointer text-lg font-bold">{strings.reportRawHeading}</summary>
               <pre className="reader-surface mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded-sm border p-3 text-sm">
-                {JSON.stringify({ app: report.app, kind: report.kind, public: report.public, private: report.private }, null, 2)}
+                {JSON.stringify(
+                  { app: report.app, kind: report.kind, public: report.public, private: report.private },
+                  null,
+                  2
+                )}
               </pre>
             </details>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className={primary} onClick={() => void handleSend()}>{strings.reportSend}</button>
-              <button type="button" className={secondary} onClick={() => setStep('contact')}>{strings.reportBack}</button>
-              <button type="button" className={secondary} onClick={onClose}>{strings.reportCancel}</button>
+              <button type="button" className={primary} onClick={() => void handleSend()}>
+                {strings.reportSend}
+              </button>
+              <button type="button" className={secondary} onClick={() => setStep('contact')}>
+                {strings.reportBack}
+              </button>
+              <button type="button" className={secondary} onClick={onClose}>
+                {strings.reportCancel}
+              </button>
             </div>
           </div>
         )}
@@ -356,7 +429,9 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
               </p>
             )}
             <div className="mt-6">
-              <button type="button" className={primary} onClick={onClose}>{strings.reportDone}</button>
+              <button type="button" className={primary} onClick={onClose}>
+                {strings.reportDone}
+              </button>
             </div>
           </div>
         )}
@@ -367,13 +442,23 @@ export function ReportView({ online, getDiagnostics, onClose, sendReport = (repo
             {failureMessage && <p className="mt-3 text-lg">{failureMessage}</p>}
             <p className="mt-3 text-lg">{strings.reportFallbackBody.replace('{inbox}', REPORT_INBOX)}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className={primary} onClick={() => void handleCopy()}>{strings.reportCopy}</button>
-              <button type="button" className={secondary} onClick={handleDownload}>{strings.reportDownload}</button>
-              <a href={reportMailtoHref(report)} className={`${secondary} inline-flex items-center`}>{strings.reportEmailIt}</a>
+              <button type="button" className={primary} onClick={() => void handleCopy()}>
+                {strings.reportCopy}
+              </button>
+              <button type="button" className={secondary} onClick={handleDownload}>
+                {strings.reportDownload}
+              </button>
+              <a href={reportMailtoHref(report)} className={`${secondary} inline-flex items-center`}>
+                {strings.reportEmailIt}
+              </a>
               {online && (
-                <button type="button" className={secondary} onClick={() => void handleSend()}>{strings.reportTryAgain}</button>
+                <button type="button" className={secondary} onClick={() => void handleSend()}>
+                  {strings.reportTryAgain}
+                </button>
               )}
-              <button type="button" className={secondary} onClick={onClose}>{strings.reportDone}</button>
+              <button type="button" className={secondary} onClick={onClose}>
+                {strings.reportDone}
+              </button>
             </div>
           </div>
         )}

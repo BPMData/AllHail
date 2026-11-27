@@ -134,7 +134,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
 
     const main = screen.getByRole('main');
@@ -153,14 +153,12 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     // Navigate to Settings & Info tab to check install guide, active voice, and required CC BY-NC-SA attribution
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
     expect(screen.getByTestId('active-voice-status').textContent).toBe(
-      `${strings.activeVoicePrefix}: ${strings.activeVoiceDevice}`,
+      `${strings.activeVoicePrefix}: ${strings.activeVoiceDevice}`
     );
     fireEvent.click(screen.getByText(strings.installTitle));
     expect(screen.getByText(strings.installChrome)).toBeDefined();
     expect(screen.getByTestId('piper-attribution').textContent).toBe(strings.piperAttribution);
-    expect(screen.getByRole('link', { name: strings.creditsLinkLabel }).getAttribute('href')).toBe(
-      '/CREDITS.md',
-    );
+    expect(screen.getByRole('link', { name: strings.creditsLinkLabel }).getAttribute('href')).toBe('/CREDITS.md');
   });
 
   it('announces loss and return of a connection without reloading', () => {
@@ -171,7 +169,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     const status = screen.getByRole('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
@@ -193,7 +191,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     expect(screen.getByRole('status').textContent).toContain(strings.offline);
   });
@@ -206,7 +204,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     act(() => pwa.onRegisterError?.());
     expect(screen.getByRole('status').textContent).toContain(strings.offlineError);
@@ -222,7 +220,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     expect(screen.getByRole('status').textContent).toContain(strings.offlineReady);
   });
@@ -238,7 +236,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     act(() => pwa.onNeedReload?.());
     expect(reload).not.toHaveBeenCalled();
@@ -253,8 +251,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
   });
 
   it('unlocks iOS audio on shutter tap, does NOT repeat Describing on Read aloud/Repeat, and respects autoRead setting', async () => {
-    const { coordinator, kokoroClient, piperClient, cueCalls, spokenTexts, unlockAudioContext } =
-      makeTestRuntime();
+    const { coordinator, kokoroClient, piperClient, cueCalls, spokenTexts, unlockAudioContext } = makeTestRuntime();
     vi.spyOn(imagePrep, 'preparePhotoBlob').mockResolvedValue({
       imageDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
       thumbnailDataUrl: 'data:image/jpeg;base64,/9j/2Q==',
@@ -270,8 +267,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
           model: 'anthropic/claude-haiku-5.5',
           mode: 'describe',
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -281,7 +278,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
 
     fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
@@ -341,7 +338,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={phoneRuntime.piperClient}
         deviceClassOverride="phone"
         hasWebGpuAdapterOverride={async () => true}
-      />,
+      />
     );
     expect(phoneRuntime.startDownloadSpy).not.toHaveBeenCalled();
     expect(phoneRuntime.piperStartDownloadSpy).not.toHaveBeenCalled();
@@ -351,7 +348,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByTestId('piper-status').textContent).toBe(strings.piperStatusOff);
 
     const piperOptIn = screen.getByLabelText(
-      strings.piperEnablePhoneLabelTemplate.replace('{size}', String(PIPER_TOTAL_SIZE_MB)),
+      strings.piperEnablePhoneLabelTemplate.replace('{size}', String(PIPER_TOTAL_SIZE_MB))
     );
     fireEvent.click(piperOptIn);
     await waitFor(() => {
@@ -370,7 +367,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={laptopNoGpu.piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => false}
-      />,
+      />
     );
     await waitFor(() => {
       expect(laptopNoGpu.piperStartDownloadSpy).toHaveBeenCalledTimes(1);
@@ -392,14 +389,20 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => true}
-      />,
+      />
     );
 
     expect(screen.queryByTestId('kokoro-banner')).toBeNull();
 
     // Start Kokoro WebGPU ~330 MB
     act(() => {
-      kokoroClient.setExternalState({ status: 'downloading', progress: 0, startedAt: startMs, backend: 'webgpu', sizeMb: 330 });
+      kokoroClient.setExternalState({
+        status: 'downloading',
+        progress: 0,
+        startedAt: startMs,
+        backend: 'webgpu',
+        sizeMb: 330,
+      });
     });
 
     const banner = screen.getByTestId('kokoro-banner');
@@ -425,7 +428,12 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     // Kokoro finishes calibration as tooSlow -> Piper banner takes over with real measured MB
     act(() => {
       kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: true, startedAt: null });
-      piperClient.setExternalState({ status: 'downloading', progress: 25, startedAt: startMs, sizeMb: PIPER_TOTAL_SIZE_MB });
+      piperClient.setExternalState({
+        status: 'downloading',
+        progress: 25,
+        startedAt: startMs,
+        sizeMb: PIPER_TOTAL_SIZE_MB,
+      });
     });
     const piperBanner = screen.getByTestId('kokoro-banner');
     expect(piperBanner.textContent).toContain(`about ${PIPER_TOTAL_SIZE_MB} MB`);
@@ -458,7 +466,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => true}
-      />,
+      />
     );
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
@@ -489,7 +497,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     expect(screen.getByTestId('kokoro-status').textContent).toBe(strings.kokoroTooSlow);
     expect(screen.getByTestId('piper-status').textContent).toBe(strings.piperStatusReady);
     expect(screen.getByTestId('active-voice-status').textContent).toBe(
-      `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`,
+      `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`
     );
     expect(piperSpokenTexts).toEqual([strings.piperPreviewText]);
 
@@ -502,7 +510,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       kokoroClient.setExternalState({ status: 'ready', progress: 100, tooSlow: false, startedAt: null });
     });
     expect(screen.getByTestId('active-voice-status').textContent).toBe(
-      `${strings.activeVoicePrefix}: ${strings.activeVoiceKokoro}`,
+      `${strings.activeVoicePrefix}: ${strings.activeVoiceKokoro}`
     );
 
     const voiceSelect = screen.getByLabelText(strings.kokoroVoiceSelectLabel) as HTMLSelectElement;
@@ -518,7 +526,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     const orderSelect = screen.getByLabelText(strings.voiceOrderLabel) as HTMLSelectElement;
     fireEvent.change(orderSelect, { target: { value: 'piper-first' } });
     expect(screen.getByTestId('active-voice-status').textContent).toBe(
-      `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`,
+      `${strings.activeVoicePrefix}: ${strings.activeVoicePiper}`
     );
   });
 
@@ -537,7 +545,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={piperClient}
         deviceClassOverride="phone"
         deviceVoicesOverride={fakeVoices}
-      />,
+      />
     );
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
@@ -591,7 +599,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="phone"
-      />,
+      />
     );
     const toggleBtn = screen.getByRole('button', { name: strings.liveViewfinderShow });
     await act(async () => {
@@ -619,7 +627,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
           model: 'anthropic/claude-haiku-5.5',
           mode: body.mode,
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -630,7 +638,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         kokoroClient={kokoroClient}
         piperClient={piperClient}
         deviceClassOverride="laptop"
-      />,
+      />
     );
 
     expect(screen.queryByRole('region', { name: strings.selectedPhotoHeading })).toBeNull();
@@ -658,13 +666,17 @@ describe('app accessibility, PWA feedback, and student mode', () => {
     const otherMode = screen.getByRole('button', { name: strings.quickLookOnPhotoInstead });
     expect(screen.queryByRole('button', { name: strings.fullDetailOnPhotoInstead })).toBeNull();
     otherMode.focus();
-    await act(async () => { fireEvent.click(otherMode); });
+    await act(async () => {
+      fireEvent.click(otherMode);
+    });
     expect(document.activeElement).toBe(otherMode);
     expect(quickLook.getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: strings.backToFullDetailOnPhoto })).toBe(otherMode);
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).mode).toBe('describe');
 
-    await act(async () => { fireEvent.click(otherMode); });
+    await act(async () => {
+      fireEvent.click(otherMode);
+    });
     expect(fullDetail.getAttribute('aria-pressed')).toBe('true');
     expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body)).mode).toBe('detail');
     expect(spokenTexts).toEqual(['Full painted details.', 'Quick painting overview.', 'Full painted details.']);
@@ -694,8 +706,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
             model: 'anthropic/claude-haiku-5.5',
             mode: 'describe',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -718,7 +730,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
 
     const clickedDownloads: Array<{ href: string; download: string }> = [];
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-      this: HTMLAnchorElement,
+      this: HTMLAnchorElement
     ) {
       clickedDownloads.push({ href: this.href, download: this.download });
     });
@@ -732,7 +744,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
           kokoroClient={phoneRuntime.kokoroClient}
           piperClient={phoneRuntime.piperClient}
           deviceClassOverride="phone"
-        />,
+        />
       );
 
       const phoneGallery = screen.getByTestId('gallery-input') as HTMLInputElement;
@@ -766,7 +778,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
           piperClient={laptopRuntime.piperClient}
           deviceClassOverride="laptop"
           hasWebGpuAdapterOverride={async () => false}
-        />,
+        />
       );
 
       const laptopGallery = screen.getByTestId('gallery-input') as HTMLInputElement;
@@ -792,7 +804,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       expect(createdBlobs[0].type).toBe('audio/mpeg');
       expect(createdBlobs[0].size).toBeGreaterThan(500);
       expect(screen.getByRole('status').textContent).toContain(
-        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoicePiper),
+        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoicePiper)
       );
 
       // 3. Switch Kokoro to ready and download again from History tab
@@ -823,7 +835,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
       expect(clickedDownloads[1].download).toBe('water-cycle-quick-look.mp3');
       expect(createdBlobs[1].type).toBe('audio/mpeg');
       expect(screen.getByRole('status').textContent).toContain(
-        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoiceKokoro),
+        strings.mp3ReadyStatusTemplate.replace('{voice}', strings.activeVoiceKokoro)
       );
     } finally {
       clickSpy.mockRestore();
@@ -869,8 +881,8 @@ describe('app accessibility, PWA feedback, and student mode', () => {
             model: 'anthropic/claude-haiku-5.5',
             mode: 'describe',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -888,7 +900,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={runtime1.piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => false}
-      />,
+      />
     );
 
     const galleryInput = screen.getByTestId('gallery-input') as HTMLInputElement;
@@ -994,7 +1006,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={runtime2.piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => false}
-      />,
+      />
     );
 
     const galleryInput2 = screen.getByTestId('gallery-input') as HTMLInputElement;
@@ -1020,7 +1032,7 @@ describe('app accessibility, PWA feedback, and student mode', () => {
         piperClient={piperClient}
         deviceClassOverride="laptop"
         hasWebGpuAdapterOverride={async () => true}
-      />,
+      />
     );
 
     act(() => {
@@ -1059,12 +1071,21 @@ describe('app accessibility, PWA feedback, and student mode', () => {
 describe('simple mode for a blind or low-vision student', () => {
   function renderApp(runtime = makeTestRuntime()) {
     const view = render(
-      <App coordinator={runtime.coordinator} kokoroClient={runtime.kokoroClient} piperClient={runtime.piperClient} deviceClassOverride="phone" />,
+      <App
+        coordinator={runtime.coordinator}
+        kokoroClient={runtime.kokoroClient}
+        piperClient={runtime.piperClient}
+        deviceClassOverride="phone"
+      />
     );
     return { ...runtime, ...view };
   }
 
-  function startFromSettings({ pin = '', pinAgain = pin, detail = false }: { pin?: string; pinAgain?: string; detail?: boolean } = {}) {
+  function startFromSettings({
+    pin = '',
+    pinAgain = pin,
+    detail = false,
+  }: { pin?: string; pinAgain?: string; detail?: boolean } = {}) {
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabInfo })[0]);
     if (detail) fireEvent.click(screen.getByRole('radio', { name: new RegExp(strings.fullDetail) }));
     if (pin) {
@@ -1081,7 +1102,10 @@ describe('simple mode for a blind or low-vision student', () => {
     expect(screen.getByRole('heading', { level: 1, name: strings.simpleModeTitle })).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByRole('main'));
     // Nothing else to swipe through: Take photo and Teacher settings only, until there's a description.
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([strings.simpleTakePhoto, strings.simpleSettings]);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      strings.simpleTakePhoto,
+      strings.simpleSettings,
+    ]);
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.getByRole('status').textContent).toContain(strings.setupStarted);
     expect(loadSettings()).toMatchObject({ simpleMode: true, simpleModeDescription: 'detail', lockPin: '2468' });
@@ -1161,7 +1185,7 @@ describe('simple mode for a blind or low-vision student', () => {
       new Response(JSON.stringify({ text: 'A red mug on a desk.', model: 'm', mode: 'detail' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      }),
+      })
     );
     vi.stubGlobal('fetch', fetchMock);
     const vibrate = vi.fn();
@@ -1205,7 +1229,12 @@ describe('the Page layout of the camera screen', () => {
   function renderPhone() {
     const runtime = makeTestRuntime();
     render(
-      <App coordinator={runtime.coordinator} kokoroClient={runtime.kokoroClient} piperClient={runtime.piperClient} deviceClassOverride="phone" />,
+      <App
+        coordinator={runtime.coordinator}
+        kokoroClient={runtime.kokoroClient}
+        piperClient={runtime.piperClient}
+        deviceClassOverride="phone"
+      />
     );
     return runtime;
   }
@@ -1215,7 +1244,8 @@ describe('the Page layout of the camera screen', () => {
     const heading = screen.getByRole('heading', { level: 1, name: strings.studentHeading });
     const shutter = screen.getByRole('button', { name: strings.takePhoto });
     const quickLook = screen.getByRole('button', { name: strings.quickLook });
-    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(follows(heading, shutter)).toBe(true);
     expect(follows(shutter, quickLook)).toBe(true);
     expect(shutter.getAttribute('aria-describedby')).toBe('capture-lead');
@@ -1231,12 +1261,15 @@ describe('the Page layout of the camera screen', () => {
       height: 600,
       byteLength: 128,
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ text: 'A worksheet titled Unit 4.', model: 'm', mode: 'describe' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    ));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ text: 'A worksheet titled Unit 4.', model: 'm', mode: 'describe' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
     renderPhone();
 
     fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
@@ -1253,7 +1286,9 @@ describe('the Page layout of the camera screen', () => {
     expect(speed.textContent).toBe('Speed 1×');
     fireEvent.click(speed);
     expect(loadSettings().speechRate).toBe(1.25);
-    expect(screen.getByRole('button', { name: 'Speech speed 1.25 times. Press for 1.5 times.' }).textContent).toBe('Speed 1.25×');
+    expect(screen.getByRole('button', { name: 'Speech speed 1.25 times. Press for 1.5 times.' }).textContent).toBe(
+      'Speed 1.25×'
+    );
     fireEvent.click(screen.getByRole('button', { name: /^Speech speed 1.25 times/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Speech speed 1.5 times/ }));
     // From the fastest it wraps round to the slowest.
@@ -1266,7 +1301,14 @@ describe('the Page layout of the camera screen', () => {
 describe('Something not working? entry', () => {
   it('is in the header on every screen, opens the guided report, and Cancel goes back', () => {
     const { coordinator, kokoroClient, piperClient } = makeTestRuntime();
-    render(<App coordinator={coordinator} kokoroClient={kokoroClient} piperClient={piperClient} deviceClassOverride="phone" />);
+    render(
+      <App
+        coordinator={coordinator}
+        kokoroClient={kokoroClient}
+        piperClient={piperClient}
+        deviceClassOverride="phone"
+      />
+    );
 
     fireEvent.click(screen.getAllByRole('button', { name: strings.tabHistory })[0]);
     const entry = screen.getByRole('button', { name: strings.reportEntry });

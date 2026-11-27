@@ -125,9 +125,10 @@ export async function clearHistory(): Promise<void> {
   }
 }
 
-export function applyDescriptionEdit<
-  T extends { text: string; originalText?: string; stashedEditedText?: string },
->(entry: T, nextText: string): T {
+export function applyDescriptionEdit<T extends { text: string; originalText?: string; stashedEditedText?: string }>(
+  entry: T,
+  nextText: string
+): T {
   const trimmed = nextText.trim();
   if (!trimmed) return entry;
   const baseOriginal = entry.originalText ?? entry.text;
@@ -159,9 +160,9 @@ export function resetDescriptionToOriginal<
   };
 }
 
-export function restoreStashedEdit<
-  T extends { text: string; originalText?: string; stashedEditedText?: string },
->(entry: T): T {
+export function restoreStashedEdit<T extends { text: string; originalText?: string; stashedEditedText?: string }>(
+  entry: T
+): T {
   if (!entry.stashedEditedText) return entry;
   const rest = { ...entry };
   delete rest.stashedEditedText;

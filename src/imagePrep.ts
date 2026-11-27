@@ -76,7 +76,7 @@ function applyExifTransform(
   ctx: CanvasRenderingContext2D,
   orientation: number,
   drawWidth: number,
-  drawHeight: number,
+  drawHeight: number
 ): void {
   switch (orientation) {
     case 2:
@@ -105,7 +105,10 @@ function applyExifTransform(
   }
 }
 
-async function canvasToJpegDataUrl(canvas: HTMLCanvasElement, quality: number): Promise<{ dataUrl: string; byteLength: number }> {
+async function canvasToJpegDataUrl(
+  canvas: HTMLCanvasElement,
+  quality: number
+): Promise<{ dataUrl: string; byteLength: number }> {
   const blob = await new Promise<Blob | null>((resolve) => {
     if (typeof canvas.toBlob === 'function') {
       canvas.toBlob((result) => resolve(result), 'image/jpeg', quality);
@@ -148,7 +151,7 @@ function drawSourceToCleanCanvas(
   srcWidth: number,
   srcHeight: number,
   orientation: number,
-  maxSide: number,
+  maxSide: number
 ): HTMLCanvasElement {
   const swapped = orientation >= 5 && orientation <= 8;
   const uprightW = swapped ? srcHeight : srcWidth;
@@ -211,20 +214,8 @@ export async function preparePhotoBlob(blob: Blob): Promise<PreparedPhoto> {
     try {
       const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
       try {
-        const uploadCanvas = drawSourceToCleanCanvas(
-          bitmap,
-          bitmap.width,
-          bitmap.height,
-          1,
-          MAX_UPLOAD_SIDE_PX,
-        );
-        const thumbCanvas = drawSourceToCleanCanvas(
-          bitmap,
-          bitmap.width,
-          bitmap.height,
-          1,
-          THUMBNAIL_SIDE_PX,
-        );
+        const uploadCanvas = drawSourceToCleanCanvas(bitmap, bitmap.width, bitmap.height, 1, MAX_UPLOAD_SIDE_PX);
+        const thumbCanvas = drawSourceToCleanCanvas(bitmap, bitmap.width, bitmap.height, 1, THUMBNAIL_SIDE_PX);
         const upload = await canvasToJpegDataUrl(uploadCanvas, UPLOAD_JPEG_QUALITY);
         const thumb = await canvasToJpegDataUrl(thumbCanvas, THUMBNAIL_JPEG_QUALITY);
         if (upload.byteLength > MAX_DECODED_BYTES) {

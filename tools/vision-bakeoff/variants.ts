@@ -24,7 +24,8 @@ const SAFE =
 const NAMING =
   'Name the artwork and artist only if there is a caption or label, or it is a famous work you are confident about. ' +
   'If the photo is of a screen, describe what is on the screen, not the screen itself. ';
-const OLD_STYLE = 'Do not identify real people from their faces. Do not open with phrases like "This image shows" or "Certainly".';
+const OLD_STYLE =
+  'Do not identify real people from their faces. Do not open with phrases like "This image shows" or "Certainly".';
 const NEW_STYLE =
   'Do not identify real people from their faces. ' +
   'Write like a good museum audio guide, with varied, natural sentences. Never use stock phrases such as ' +
@@ -35,7 +36,8 @@ function notice(o: Opts): string {
   if (o.notice === 'none') return '';
   const base = 'Next, describe the thing the artist or photographer would most want the viewer to notice first. ';
   return o.notice === 'examples'
-    ? base + 'With people, that is often an expression, a glance or a gesture that sets the tone, such as a sly smile, a look of fear or a pointing hand. '
+    ? base +
+        'With people, that is often an expression, a glance or a gesture that sets the tone, such as a sly smile, a look of fear or a pointing hand. '
     : base;
 }
 
@@ -81,7 +83,9 @@ function detail(o: Opts) {
       'If some words cannot be read, say "unclear" for them instead of guessing. ' +
       'Then describe everything visual, systematically: the overall layout first, then area by area ' +
       '(foreground to background, left to right). Cover people and figures (pose, clothing, expression, what they are doing), ' +
-      (o.mood ? 'objects, setting, colors, light, and the mood and atmosphere they create. ' : 'objects, setting, colors, light and mood. ') +
+      (o.mood
+        ? 'objects, setting, colors, light, and the mood and atmosphere they create. '
+        : 'objects, setting, colors, light and mood. ') +
       'For an artwork, also give the medium, style and technique, and details a teacher might ask about. ' +
       'For a chart or graph, give its type, title, axes, the values, and the main trend. ' +
       NAMING +

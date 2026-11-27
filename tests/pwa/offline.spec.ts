@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { strings } from '../../shared/strings.ts';
 
-test('meets Chrome install checks and reopens offline without caching API replies', async ({ page, context }, testInfo) => {
+test('meets Chrome install checks and reopens offline without caching API replies', async ({
+  page,
+  context,
+}, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
@@ -41,7 +44,12 @@ test('meets Chrome install checks and reopens offline without caching API replie
   await expect(reopened.getByRole('heading', { name: strings.studentHeading })).toBeVisible();
   await expect(reopened.getByRole('status')).toContainText(strings.offline);
   const apiWorksOffline = await reopened.evaluate(async () => {
-    try { await fetch('/api/health'); return true; } catch { return false; }
+    try {
+      await fetch('/api/health');
+      return true;
+    } catch {
+      return false;
+    }
   });
   expect(apiWorksOffline).toBe(false);
   const cachedPaths = await reopened.evaluate(async () => {

@@ -61,15 +61,15 @@ type OpenRouterResponse = {
   }>;
 };
 
-type AttemptOutcome =
-  | { ok: true; text: string; model: string }
-  | { ok: false; reason: string; timedOutTotal: boolean };
+type AttemptOutcome = { ok: true; text: string; model: string } | { ok: false; reason: string; timedOutTotal: boolean };
 
 function extractText(content: unknown): string {
   if (typeof content === 'string') return content.trim();
   if (Array.isArray(content)) {
     return content
-      .map((part) => (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string' ? part.text : ''))
+      .map((part) =>
+        part && typeof part === 'object' && 'text' in part && typeof part.text === 'string' ? part.text : ''
+      )
       .join('')
       .trim();
   }
@@ -108,10 +108,13 @@ async function callSingleModel({
     parentSignal.addEventListener('abort', onParentAbort, { once: true });
   }
 
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, Math.max(1, timeoutMs));
+  const timer = setTimeout(
+    () => {
+      timedOut = true;
+      controller.abort();
+    },
+    Math.max(1, timeoutMs)
+  );
   if (typeof timer === 'object' && timer !== null && 'unref' in timer && typeof timer.unref === 'function') {
     timer.unref();
   }

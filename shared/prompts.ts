@@ -61,7 +61,8 @@ export const PROMPTS: Record<PromptMode, { system: string; user: string }> = {
       'The image may be sideways, upside down or at an angle; read and describe it the right way round anyway. ' +
       CARE +
       SAFE +
-      NEW_STYLE + ' ' +
+      NEW_STYLE +
+      ' ' +
       'Be as long as the image needs, usually 150 to 500 words.',
     user: 'Describe this in full detail.',
   },

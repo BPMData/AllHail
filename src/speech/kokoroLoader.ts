@@ -13,7 +13,7 @@ export type KokoroLoadProgress = {
 export type KokoroModelLike<TVoice extends string = 'af_heart'> = {
   generate: (
     text: string,
-    options: { voice?: TVoice; speed?: number },
+    options: { voice?: TVoice; speed?: number }
   ) => Promise<{ audio: Float32Array | ArrayLike<number>; sampling_rate?: number }>;
 };
 
@@ -56,7 +56,7 @@ export function hasAudiblePcm(samples: Float32Array | ArrayLike<number>): boolea
 
 export async function runKokoroCalibration<TModel extends KokoroModelLike>(
   instance: TModel,
-  nowMs: () => number = () => performance.now(),
+  nowMs: () => number = () => performance.now()
 ): Promise<{ audible: boolean; tooSlow: boolean }> {
   try {
     // Pass 1: warm up GPU shaders and throw away timing.
@@ -64,10 +64,10 @@ export async function runKokoroCalibration<TModel extends KokoroModelLike>(
 
     // Pass 2: time calibration sentence against real-time audio duration.
     const startedAt = nowMs();
-    const calibration = await instance.generate(
-      'AllHail helps students listen clearly.',
-      { voice: 'af_heart', speed: 1 },
-    );
+    const calibration = await instance.generate('AllHail helps students listen clearly.', {
+      voice: 'af_heart',
+      speed: 1,
+    });
     const generationMs = nowMs() - startedAt;
     const sampleRate = calibration.sampling_rate || 24000;
     const audioMs = (calibration.audio.length / sampleRate) * 1000;
@@ -100,7 +100,7 @@ export type LoadKokoroDeps<TModel extends KokoroModelLike> = {
  * real time, Piper replaces it instead.
  */
 export async function loadKokoroWebGpu<TModel extends KokoroModelLike>(
-  deps: LoadKokoroDeps<TModel>,
+  deps: LoadKokoroDeps<TModel>
 ): Promise<KokoroLoadResult<TModel>> {
   const nowMs = deps.nowMs ?? (() => performance.now());
   const canUseWebGpu = await deps.hasWebGpuAdapter().catch(() => false);

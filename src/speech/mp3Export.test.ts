@@ -32,7 +32,7 @@ describe('resolveMp3Provider', () => {
         piperReady: true,
         piperAllowed: true,
         piperTooSlow: false,
-      }),
+      })
     ).toBe('kokoro');
 
     expect(
@@ -45,7 +45,7 @@ describe('resolveMp3Provider', () => {
         piperReady: true,
         piperAllowed: true,
         piperTooSlow: false,
-      }),
+      })
     ).toBe('piper');
 
     expect(
@@ -58,7 +58,7 @@ describe('resolveMp3Provider', () => {
         piperReady: true,
         piperAllowed: true,
         piperTooSlow: false,
-      }),
+      })
     ).toBe('piper');
 
     expect(
@@ -71,7 +71,7 @@ describe('resolveMp3Provider', () => {
         piperReady: false,
         piperAllowed: false,
         piperTooSlow: false,
-      }),
+      })
     ).toBeNull();
   });
 });
@@ -90,10 +90,7 @@ describe('MP3 encoding from Kokoro Float32 PCM and Piper 22050 Hz WAV', () => {
     const piperBytes = new Uint8Array(await mp3Piper.arrayBuffer());
     expect(piperBytes[0]).toBe(0xff);
 
-    const stitchedKokoro = stitchPcmChunks(
-      [{ samples: buildToneSamples(24000, 0.3), sampleRate: 24000 }],
-      200,
-    );
+    const stitchedKokoro = stitchPcmChunks([{ samples: buildToneSamples(24000, 0.3), sampleRate: 24000 }], 200);
     const mp3Kokoro = encodeMonoMp3(stitchedKokoro.samples, stitchedKokoro.sampleRate);
     expect(mp3Kokoro.type).toBe('audio/mpeg');
     expect(mp3Kokoro.size).toBeGreaterThan(500);
@@ -101,11 +98,11 @@ describe('MP3 encoding from Kokoro Float32 PCM and Piper 22050 Hz WAV', () => {
 
   it('builds readable filenames from source photos or fallback dates', () => {
     expect(buildMp3Filename({ sourceName: 'Water_Cycle Diagram.jpg', mode: 'detail' })).toBe(
-      'water-cycle-diagram-full-detail.mp3',
+      'water-cycle-diagram-full-detail.mp3'
     );
-    expect(buildMp3Filename({ sourceName: 'photo.jpg', mode: 'describe', createdAt: Date.UTC(2026, 10, 16, 12) })).toMatch(
-      /^allhail-quick-look-2026-11-1[56]\.mp3$/,
-    );
+    expect(
+      buildMp3Filename({ sourceName: 'photo.jpg', mode: 'describe', createdAt: Date.UTC(2026, 10, 16, 12) })
+    ).toMatch(/^allhail-quick-look-2026-11-1[56]\.mp3$/);
   });
 
   it('cleans speech text and exports via Kokoro or Piper client synthesizers', async () => {
@@ -122,7 +119,7 @@ describe('MP3 encoding from Kokoro Float32 PCM and Piper 22050 Hz WAV', () => {
     const piperClient = new PiperBrowserClient({
       synthesizer: {
         synthesizeChunk: vi.fn(async () =>
-          buildTestWavArrayBuffer({ sampleRate: 22050, numSamples: 4410, amplitude: 6000 }),
+          buildTestWavArrayBuffer({ sampleRate: 22050, numSamples: 4410, amplitude: 6000 })
         ),
         cancelJob: vi.fn(),
       },

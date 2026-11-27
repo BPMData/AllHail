@@ -322,12 +322,9 @@ export function CaptureView({
     }
   };
 
-  const activeModeLabel =
-    currentResult?.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
+  const activeModeLabel = currentResult?.mode === 'detail' ? strings.modeFullDetailLabel : strings.modeQuickLookLabel;
 
-  const isEdited = Boolean(
-    currentResult?.originalText && currentResult.originalText !== currentResult.text,
-  );
+  const isEdited = Boolean(currentResult?.originalText && currentResult.originalText !== currentResult.text);
   const editingActive = editing && !settings.disableEditing;
 
   const displayedProvider = speechStatus.activeProvider ?? lastVoiceUsed;
@@ -342,9 +339,14 @@ export function CaptureView({
 
   const alternativeMode = selectedPhoto && (selectedPhoto.mode === 'detail' ? 'describe' : 'detail');
   const returningToInitialMode = alternativeMode === selectedPhoto?.initialMode;
-  const alternativeLabel = alternativeMode === 'describe'
-    ? returningToInitialMode ? strings.backToQuickLookOnPhoto : strings.quickLookOnPhotoInstead
-    : returningToInitialMode ? strings.backToFullDetailOnPhoto : strings.fullDetailOnPhotoInstead;
+  const alternativeLabel =
+    alternativeMode === 'describe'
+      ? returningToInitialMode
+        ? strings.backToQuickLookOnPhoto
+        : strings.quickLookOnPhotoInstead
+      : returningToInitialMode
+        ? strings.backToFullDetailOnPhoto
+        : strings.fullDetailOnPhotoInstead;
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
@@ -377,7 +379,9 @@ export function CaptureView({
           <h1 id="capture-heading" className="text-3xl font-bold leading-tight sm:text-4xl">
             {strings.studentHeading}
           </h1>
-          <p id="capture-lead" hidden>{strings.studentLead}</p>
+          <p id="capture-lead" hidden>
+            {strings.studentLead}
+          </p>
         </div>
 
         <div className="panel-body space-y-5">
@@ -392,12 +396,16 @@ export function CaptureView({
           </button>
 
           <div role="group" aria-labelledby="description-mode-label">
-            <p id="description-mode-label" className="mb-2 text-sm font-bold">{strings.descriptionMode}</p>
+            <p id="description-mode-label" className="mb-2 text-sm font-bold">
+              {strings.descriptionMode}
+            </p>
             <div className="segmented grid w-full grid-cols-2">
-              {([
-                { mode: 'describe', label: strings.quickLook, hint: strings.quickLookHint },
-                { mode: 'detail', label: strings.fullDetail, hint: strings.fullDetailHint },
-              ] as const).map(({ mode, label, hint }) => (
+              {(
+                [
+                  { mode: 'describe', label: strings.quickLook, hint: strings.quickLookHint },
+                  { mode: 'detail', label: strings.fullDetail, hint: strings.fullDetailHint },
+                ] as const
+              ).map(({ mode, label, hint }) => (
                 <button
                   key={mode}
                   type="button"
@@ -405,11 +413,17 @@ export function CaptureView({
                   aria-disabled={photoBusy}
                   aria-labelledby={`description-mode-name-${mode}`}
                   aria-describedby={`description-mode-hint-${mode}`}
-                  onClick={() => { if (!photoBusy) onModeChange(mode); }}
+                  onClick={() => {
+                    if (!photoBusy) onModeChange(mode);
+                  }}
                   className="seg-option min-h-[56px] px-3 py-2 text-left"
                 >
-                  <span id={`description-mode-name-${mode}`} className="block font-bold">{label}</span>
-                  <span id={`description-mode-hint-${mode}`} className="block text-sm">{hint}</span>
+                  <span id={`description-mode-name-${mode}`} className="block font-bold">
+                    {label}
+                  </span>
+                  <span id={`description-mode-hint-${mode}`} className="block text-sm">
+                    {hint}
+                  </span>
                 </button>
               ))}
             </div>
@@ -452,7 +466,9 @@ export function CaptureView({
 
           {selectedPhoto && alternativeMode && (
             <section aria-labelledby="selected-photo-heading" className="panel-card rounded-sm border p-4">
-              <h2 id="selected-photo-heading" className="mb-3 text-base font-bold">{strings.selectedPhotoHeading}</h2>
+              <h2 id="selected-photo-heading" className="mb-3 text-base font-bold">
+                {strings.selectedPhotoHeading}
+              </h2>
               <img
                 src={selectedPhoto.photo.thumbnailDataUrl}
                 alt={strings.selectedPhotoAlt}
@@ -461,7 +477,9 @@ export function CaptureView({
               <button
                 type="button"
                 aria-disabled={photoBusy}
-                onClick={() => { if (!photoBusy) void onSwitchPhotoMode(alternativeMode); }}
+                onClick={() => {
+                  if (!photoBusy) void onSwitchPhotoMode(alternativeMode);
+                }}
                 className="surface-button mt-3 min-h-[48px] rounded-sm px-3 py-2 text-sm font-bold aria-disabled:opacity-60"
               >
                 {alternativeLabel}
@@ -488,209 +506,206 @@ export function CaptureView({
           </div>
 
           <div className="panel-body">
-          {currentResult ? (
-            <>
-              {editingActive ? (
-                <div className="mt-4 space-y-3">
-                  <label htmlFor="description-editor" className="block text-base font-bold">
-                    {strings.editTextareaLabel}
-                  </label>
-                  <textarea
-                    id="description-editor"
-                    ref={editorRef}
-                    rows={6}
-                    value={draftText}
-                    onChange={(e) => {
-                      setDraftText(e.target.value);
-                      if (editError && e.target.value.trim()) {
-                        setEditError(null);
-                      }
-                    }}
-                    className="reader-surface block min-h-[160px] w-full rounded-sm border p-4 text-xl leading-relaxed"
-                  />
-                  {editError && (
-                    <p role="alert" className="text-sm font-bold">
-                      {editError}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveEditClick()}
-                      className="primary-cta min-h-[52px] flex-1 rounded-sm px-5 py-3 text-base font-bold"
-                    >
-                      {strings.saveChanges}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelEditClick}
-                      className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
-                    >
-                      {strings.cancelEdit}
-                    </button>
-                    {(isEdited ||
-                      draftText.trim() !==
-                        (currentResult.originalText ?? currentResult.text).trim()) &&
-                    onResetOriginal ? (
+            {currentResult ? (
+              <>
+                {editingActive ? (
+                  <div className="mt-4 space-y-3">
+                    <label htmlFor="description-editor" className="block text-base font-bold">
+                      {strings.editTextareaLabel}
+                    </label>
+                    <textarea
+                      id="description-editor"
+                      ref={editorRef}
+                      rows={6}
+                      value={draftText}
+                      onChange={(e) => {
+                        setDraftText(e.target.value);
+                        if (editError && e.target.value.trim()) {
+                          setEditError(null);
+                        }
+                      }}
+                      className="reader-surface block min-h-[160px] w-full rounded-sm border p-4 text-xl leading-relaxed"
+                    />
+                    {editError && (
+                      <p role="alert" className="text-sm font-bold">
+                        {editError}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-3">
                       <button
                         type="button"
-                        onClick={() => void handleResetOriginalClick(true)}
-                        className={
-                          confirmReset
-                            ? 'danger-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
-                            : 'surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
-                        }
+                        onClick={() => void handleSaveEditClick()}
+                        className="primary-cta min-h-[52px] flex-1 rounded-sm px-5 py-3 text-base font-bold"
                       >
-                        {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
+                        {strings.saveChanges}
                       </button>
-                    ) : (
-                      (stashedUnsavedDraft !== null ||
-                        Boolean(currentResult.stashedEditedText && onRestoreStashedEdit)) && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEditClick}
+                        className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                      >
+                        {strings.cancelEdit}
+                      </button>
+                      {(isEdited || draftText.trim() !== (currentResult.originalText ?? currentResult.text).trim()) &&
+                      onResetOriginal ? (
                         <button
                           type="button"
-                          onClick={() => void handleBringBackEditsClick(true)}
-                          className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                          onClick={() => void handleResetOriginalClick(true)}
+                          className={
+                            confirmReset
+                              ? 'danger-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
+                              : 'surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold'
+                          }
                         >
-                          {strings.bringBackEdits}
+                          {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
                         </button>
-                      )
-                    )}
+                      ) : (
+                        (stashedUnsavedDraft !== null ||
+                          Boolean(currentResult.stashedEditedText && onRestoreStashedEdit)) && (
+                          <button
+                            type="button"
+                            onClick={() => void handleBringBackEditsClick(true)}
+                            className="surface-button min-h-[52px] rounded-sm border px-5 py-3 text-base font-bold"
+                          >
+                            {strings.bringBackEdits}
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <>
-                  {/* Tap anywhere on the description card to pause/resume or play */}
-                  <button
-                    type="button"
-                    aria-label={strings.readerTapToPause}
-                    aria-describedby="reader-description"
-                    aria-pressed={speechStatus.speaking && !speechStatus.paused}
-                    onClick={handleReaderCardClick}
-                    className="reader-surface mt-4 block w-full rounded-sm border p-4 text-left text-xl leading-relaxed whitespace-pre-wrap"
-                  >
-                    <span id="reader-description">{currentResult.text}</span>
-                  </button>
+                ) : (
+                  <>
+                    {/* Tap anywhere on the description card to pause/resume or play */}
+                    <button
+                      type="button"
+                      aria-label={strings.readerTapToPause}
+                      aria-describedby="reader-description"
+                      aria-pressed={speechStatus.speaking && !speechStatus.paused}
+                      onClick={handleReaderCardClick}
+                      className="reader-surface mt-4 block w-full rounded-sm border p-4 text-left text-xl leading-relaxed whitespace-pre-wrap"
+                    >
+                      <span id="reader-description">{currentResult.text}</span>
+                    </button>
 
-                  <p className="mt-3 text-sm opacity-75">
-                    {strings.describedWith} {currentResult.model}
-                  </p>
+                    <p className="mt-3 text-sm opacity-75">
+                      {strings.describedWith} {currentResult.model}
+                    </p>
 
-                  {/* Playback bar: the main control, Repeat and speed. It stays in thumb reach while reading on a phone. */}
-                  <div className="transport mt-4" role="group" aria-label={strings.playbackLabel}>
-                    {speechStatus.speaking ? (
-                      <button type="button" onClick={onTogglePause} className="primary-cta">
-                        {speechStatus.paused ? strings.resumeSpeech : strings.pauseSpeech}
-                      </button>
-                    ) : (
+                    {/* Playback bar: the main control, Repeat and speed. It stays in thumb reach while reading on a phone. */}
+                    <div className="transport mt-4" role="group" aria-label={strings.playbackLabel}>
+                      {speechStatus.speaking ? (
+                        <button type="button" onClick={onTogglePause} className="primary-cta">
+                          {speechStatus.paused ? strings.resumeSpeech : strings.pauseSpeech}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onUnlockPlayback();
+                            onPlayResult(currentResult.text);
+                          }}
+                          className="primary-cta"
+                        >
+                          {strings.playAloud}
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => {
                           onUnlockPlayback();
-                          onPlayResult(currentResult.text);
+                          onRepeat();
                         }}
-                        className="primary-cta"
                       >
-                        {strings.playAloud}
+                        {strings.repeatSpeech}
                       </button>
-                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onUnlockPlayback();
-                        onRepeat();
-                      }}
-                    >
-                      {strings.repeatSpeech}
-                    </button>
-
-                    <button
-                      type="button"
-                      aria-label={strings.speedStepLabel
-                        .replace('{rate}', formatRate(currentRate))
-                        .replace('{next}', formatRate(nextRate))}
-                      onClick={() => onRateChange(nextRate)}
-                    >
-                      {strings.speedStep.replace('{rate}', formatRate(currentRate))}
-                    </button>
-                  </div>
-                  <div className="secondary-toolbar flex flex-wrap gap-1">
-                    {speechStatus.speaking && (
                       <button
                         type="button"
-                        onClick={onStopSpeech}
-                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
+                        aria-label={strings.speedStepLabel
+                          .replace('{rate}', formatRate(currentRate))
+                          .replace('{next}', formatRate(nextRate))}
+                        onClick={() => onRateChange(nextRate)}
                       >
-                        {strings.stopSpeech}
+                        {strings.speedStep.replace('{rate}', formatRate(currentRate))}
                       </button>
-                    )}
-
-                    {onCopyText && (
-                      <button
-                        type="button"
-                        onClick={() => onCopyText(currentResult.text)}
-                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
-                      >
-                        {strings.copyText}
-                      </button>
-                    )}
-
-                    {onDownloadMp3 && (
-                      <button
-                        type="button"
-                        disabled={mp3Busy}
-                        aria-busy={mp3Busy}
-                        data-testid="download-mp3-button"
-                        onClick={() => onDownloadMp3(currentResult)}
-                        className="min-h-[48px] px-4 py-2 text-sm font-bold disabled:opacity-60"
-                      >
-                        {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
-                      </button>
-                    )}
-
-                    {!settings.disableEditing && onSaveEdit && (
-                      <button
-                        type="button"
-                        onClick={handleStartEdit}
-                        className="min-h-[48px] px-4 py-2 text-sm font-bold"
-                      >
-                        {strings.editDescription}
-                      </button>
-                    )}
-
-                    {!settings.disableEditing && isEdited && onResetOriginal ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleResetOriginalClick(false)}
-                        className={
-                          confirmReset
-                            ? 'danger-button min-h-[48px] px-4 py-2 text-sm font-bold'
-                            : 'min-h-[48px] px-4 py-2 text-sm font-bold'
-                        }
-                      >
-                        {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
-                      </button>
-                    ) : (
-                      !settings.disableEditing &&
-                      currentResult.stashedEditedText &&
-                      onRestoreStashedEdit && (
+                    </div>
+                    <div className="secondary-toolbar flex flex-wrap gap-1">
+                      {speechStatus.speaking && (
                         <button
                           type="button"
-                          onClick={() => void handleBringBackEditsClick(false)}
+                          onClick={onStopSpeech}
                           className="min-h-[48px] px-4 py-2 text-sm font-bold"
                         >
-                          {strings.bringBackEdits}
+                          {strings.stopSpeech}
                         </button>
-                      )
-                    )}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <p className="mt-4 text-lg opacity-80">{strings.readerEmpty}</p>
-          )}
+                      )}
 
+                      {onCopyText && (
+                        <button
+                          type="button"
+                          onClick={() => onCopyText(currentResult.text)}
+                          className="min-h-[48px] px-4 py-2 text-sm font-bold"
+                        >
+                          {strings.copyText}
+                        </button>
+                      )}
+
+                      {onDownloadMp3 && (
+                        <button
+                          type="button"
+                          disabled={mp3Busy}
+                          aria-busy={mp3Busy}
+                          data-testid="download-mp3-button"
+                          onClick={() => onDownloadMp3(currentResult)}
+                          className="min-h-[48px] px-4 py-2 text-sm font-bold disabled:opacity-60"
+                        >
+                          {mp3Busy ? (mp3ProgressLabel ?? strings.downloadingMp3) : strings.downloadMp3}
+                        </button>
+                      )}
+
+                      {!settings.disableEditing && onSaveEdit && (
+                        <button
+                          type="button"
+                          onClick={handleStartEdit}
+                          className="min-h-[48px] px-4 py-2 text-sm font-bold"
+                        >
+                          {strings.editDescription}
+                        </button>
+                      )}
+
+                      {!settings.disableEditing && isEdited && onResetOriginal ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleResetOriginalClick(false)}
+                          className={
+                            confirmReset
+                              ? 'danger-button min-h-[48px] px-4 py-2 text-sm font-bold'
+                              : 'min-h-[48px] px-4 py-2 text-sm font-bold'
+                          }
+                        >
+                          {confirmReset ? strings.confirmResetToOriginal : strings.resetToOriginal}
+                        </button>
+                      ) : (
+                        !settings.disableEditing &&
+                        currentResult.stashedEditedText &&
+                        onRestoreStashedEdit && (
+                          <button
+                            type="button"
+                            onClick={() => void handleBringBackEditsClick(false)}
+                            className="min-h-[48px] px-4 py-2 text-sm font-bold"
+                          >
+                            {strings.bringBackEdits}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="mt-4 text-lg opacity-80">{strings.readerEmpty}</p>
+            )}
           </div>
         </div>
       </section>
