@@ -16,6 +16,7 @@ jobs:
       # Install the exact versions in package-lock.json.
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
+      - run: npx prettier --check .
       - run: npm run build
       - run: npm test
       - name: Check native Node TypeScript support
