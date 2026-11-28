@@ -293,10 +293,10 @@ export const strings = {
   reportDetailsHint: 'Please don’t include names or private information.',
   reportStepsLabel: 'How to make it happen again (optional)',
   reportStepsHint: 'For example: I opened Camera, chose Full detail, then took a photo.',
-  reportStepContact: 'Can we reply to you?',
+  reportStepContact: 'Want to hear when it’s fixed?',
   reportEmailLabel: 'Your email (optional)',
   reportEmailHint:
-    'Only if you want a reply. It goes to the AllHail team’s private inbox, never into the public report.',
+    'Only if you want one email when there’s a fix. Nothing else is sent to it, and it never goes into the public report.',
   reportEmailInvalid: 'That email address doesn’t look right. Fix it, or leave the box empty.',
   reportStepReview: 'Check and send',
   reportReviewIntro:
@@ -318,7 +318,7 @@ export const strings = {
   reportSending: 'Sending report…',
   reportSentHeading: 'Thank you. Your report was sent.',
   reportSentBody: 'The AllHail team will look at it.',
-  reportSentReply: 'They can reply to the email you gave.',
+  reportSentReply: 'You’ll get one email when there’s a fix.',
   reportIssueLink: 'Open the public report on GitHub',
   reportFailedHeading: 'Your report couldn’t be sent',
   reportOfflineHeading: 'You’re offline, so the report can’t be sent now',

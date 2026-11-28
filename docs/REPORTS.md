@@ -1,6 +1,6 @@
 # Problem reports
 
-The **Something not working?** button at the top of every AllHail screen walks someone through four short steps: what went wrong, what happened (all optional), whether they want a reply, and a check of exactly what will be sent. Nothing is sent until they press **Send report**.
+The **Something not working?** button at the top of every AllHail screen walks someone through four short steps: what went wrong, what happened (all optional), whether they want an email when it’s fixed, and a check of exactly what will be sent. Nothing is sent until they press **Send report**.
 
 ## How a report travels
 
@@ -8,14 +8,14 @@ The **Something not working?** button at the top of every AllHail screen walks s
 2. The server checks it (known categories and ticks only, safe diagnostics only, text trimmed) and limits each address to 5 reports an hour.
 3. The server writes two things ([`server/reportMessage.ts`](../server/reportMessage.ts)):
    - a **public GitHub issue**, labeled **problem-report**, from the **public part only**: the category, what they ticked, the AllHail version, browser and system, and feature and voice status;
-   - a **private email** with the whole report, the subject starting **[AllHail]**. The person's own words and email are only in this email, never in the issue. When they gave an email, pressing **Reply** answers them.
+   - a **private email** with the whole report, the subject starting **[AllHail]**. The person's own words and email are only in this email, never in the issue.
 4. It hands both, with AllHail's shared secret, to the **shared reports relay**: OverBoard's Google Apps Script ([`tools/report-relay.gs` in BPMData/OverBoard](https://github.com/BPMData/OverBoard/blob/main/tools/report-relay.gs)), which runs under the shared reports Gmail account, **overboard.reporting@gmail.com**. OverBoard, AllAboard, AllHail and OverHeard all use this one relay. It opens the issue in BPMData/AllHail and emails the reports inbox.
 
 If anything fails, or the device is offline, the page offers **Copy report**, **Download report** and **Email the report**, all addressed to the same inbox.
 
 **Never sent:** photos, descriptions, saved history, the name of the chosen device voice, or anything typed elsewhere in AllHail. The "last app message" is only included when it is one of AllHail's own fixed messages.
 
-**No automatic emails to the person.** The shared relay doesn't send thank-you or "it's fixed" emails for AllHail reports. To answer someone, reply to the report email.
+**One email to the person, only if they gave an address.** There's no thank-you email: the app shows "Thank you. Your report was sent." once the relay has the report. When the issue is **closed as completed**, the shared relay sends them one "here's what we changed" email (a short paragraph from your comments and pull request titles, then how to reload AllHail), and nothing else. An issue closed as not planned or as a duplicate sends nothing.
 
 ## Settings
 
