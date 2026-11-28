@@ -27,3 +27,6 @@ public/piper/
 public/CREDITS.md
 AISTUDIO_TO_GITHUB.md
 trimming_size_plan_01.md
+
+# Google credentials written by google-github-actions/auth: never commit
+gha-creds-*.json
