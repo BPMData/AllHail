@@ -49,7 +49,8 @@ The server serves the built app only when `NODE_ENV=production`; otherwise it ru
 
 Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). It runs the checks below, then deploys the `allhail` Cloud Run service with `gcloud run deploy --source .` on port 3000.
 
-- The workflow logs in with the `GCP_SA_KEY` repository secret.
+- The workflow logs in to Google Cloud with Workload Identity Federation: GitHub gives the job a short-lived token, and Google accepts it only from this repository's `main` branch (provider `allhail` in the `github` pool, acting as `github-deployer`). No key is stored in GitHub.
+- Before uploading, `scripts/check-upload.sh` stops the deploy if a `gha-creds-*.json` credentials file would be uploaded or `package-lock.json` would be missing. After deploying, `scripts/check-deploy.sh` checks for a new ready revision labelled with the commit and that the live address answers.
 - `OPENROUTER_API_KEY`, `REPORT_RELAY_URL` and `REPORT_RELAY_SECRET` are set on the Cloud Run service itself (the report ones are explained in [docs/REPORTS.md](docs/REPORTS.md)). The deploy sets only `NODE_ENV=production` and leaves the other service variables alone, so they don't need setting again.
 - The deploy keeps `--max-instances 1`. The rate limit is kept in memory, so more instances would multiply how much of the key one person can use.
 - `https://bpmdata.github.io/allhail` is a short link that redirects to the service's Cloud Run URL. The redirect isn't in this repo. Because the browser ends up on the Cloud Run address, the installed app, its offline files and its history all belong to that address, not to github.io.

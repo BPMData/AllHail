@@ -23,3 +23,6 @@ sample_images/
 tools/vision-bakeoff/photos/
 tools/vision-bakeoff/results/
 research_outputs/
+
+# Google credentials written by google-github-actions/auth: never upload
+gha-creds-*.json

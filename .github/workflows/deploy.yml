@@ -17,6 +17,11 @@ jobs:
     name: Verify and deploy allhail
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # id-token: write lets the job ask GitHub for an OIDC token, which Google
+    # trades for short-lived credentials (Workload Identity Federation). No stored key.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
 
@@ -46,7 +51,21 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: projects/606573080592/locations/global/workloadIdentityPools/github/providers/allhail
+          service_account: github-deployer@loyal-rookery-403218.iam.gserviceaccount.com
+
+      # Stops the deploy if the credentials file from the step above would be uploaded,
+      # or if package-lock.json would be missing.
+      - name: Check files for upload
+        run: scripts/check-upload.sh .
+
+      - name: Record current revision
+        id: prior
+        run: |
+          rev="$(gcloud run services describe allhail --region us-east1 --project loyal-rookery-403218 \
+            --format='value(status.latestReadyRevisionName)')"
+          echo "Current revision: ${rev}"
+          echo "revision=${rev}" >> "$GITHUB_OUTPUT"
 
       # The Buildpacks launcher runs `npm start` (`node server.ts`) on port 3000.
       # --update-env-vars NODE_ENV=production makes server.ts serve the built app. It adds or
@@ -66,3 +85,7 @@ jobs:
             --update-env-vars NODE_ENV=production \
             --update-labels "managed-by=github-actions,commit-sha=${GITHUB_SHA}" \
             --quiet
+
+      # Confirms a new revision is ready, labelled with this commit, and the live URL answers.
+      - name: Check deploy
+        run: scripts/check-deploy.sh "${{ steps.prior.outputs.revision }}" "${GITHUB_SHA}"
