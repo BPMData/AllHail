@@ -69,10 +69,10 @@ jobs:
 
       # The Buildpacks launcher runs `npm start` (`node server.ts`) on port 3000.
       # --update-env-vars NODE_ENV=production makes server.ts serve the built app. It adds or
-      # replaces only NODE_ENV, so OPENROUTER_API_KEY and other plain settings on the service stay as they are.
-      # --service-account: the service runs as allhail-run, which can read only AllHail's own report secrets.
-      # --set-secrets: the problem-report relay's address and shared secret (docs/REPORTS.md) come from
-      # Secret Manager on every deploy, so nothing is pasted into the Cloud Run console.
+      # replaces only NODE_ENV, so other plain settings on the service stay as they are.
+      # --service-account: the service runs as allhail-run, which can read only AllHail's own secrets.
+      # --set-secrets: the OpenRouter key and the problem-report relay's address and shared secret (docs/REPORTS.md)
+      # come from Secret Manager on every deploy, so nothing is pasted into the Cloud Run console.
       # --max-instances 1: the /api/describe rate limit (server/rateLimit.ts) is kept in memory per
       # instance, so more instances would multiply how much of the OpenRouter key one person can use.
       - name: Deploy to Cloud Run
@@ -86,7 +86,7 @@ jobs:
             --max-instances 1 \
             --service-account allhail-run@loyal-rookery-403218.iam.gserviceaccount.com \
             --update-env-vars NODE_ENV=production \
-            --set-secrets REPORT_RELAY_URL=allhail-report-relay-url:latest,REPORT_RELAY_SECRET=allhail-report-relay-secret:latest \
+            --set-secrets OPENROUTER_API_KEY=allhail-openrouter-api-key:latest,REPORT_RELAY_URL=allhail-report-relay-url:latest,REPORT_RELAY_SECRET=allhail-report-relay-secret:latest \
             --update-labels "managed-by=github-actions,commit-sha=${GITHUB_SHA}" \
             --quiet
 

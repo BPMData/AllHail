@@ -26,7 +26,7 @@ The server needs two settings. Without them, **Send report** shows the copy/down
 | `REPORT_RELAY_URL`    | the shared relay's Web app address (ends in `/exec`)                                           | Secret Manager secret `allhail-report-relay-url`    |
 | `REPORT_RELAY_SECRET` | AllHail's shared secret; the relay keeps the same value as its `ALLHAIL_TOKEN` script property | Secret Manager secret `allhail-report-relay-secret` |
 
-The deploy workflow attaches both to the `allhail` Cloud Run service with `--set-secrets` on every deploy. The service runs as `allhail-run`, which may read only these two secrets. Nothing is pasted into the Cloud Run console or kept in GitHub.
+The deploy workflow attaches both to the `allhail` Cloud Run service with `--set-secrets` on every deploy. The service runs as `allhail-run`, which may read only AllHail's own secrets (these two and the OpenRouter key). Nothing is pasted into the Cloud Run console or kept in GitHub.
 
 To change one, add a new version of the secret in Secret Manager; the next deploy picks it up. If you change the secret, change `ALLHAIL_TOKEN` in the relay's script properties to match.
 
