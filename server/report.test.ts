@@ -63,27 +63,33 @@ const configured = (fetchFn: typeof fetch): ReportDeps => ({
 });
 
 describe('POST /api/report', () => {
-  it('cleans the report and passes it to the relay with the secret', async () => {
-    const fetchFn = relayReturning({ ok: true, issue: 12, url: 'https://github.com/BPMData/allhail/issues/12' });
+  it('sends the shared relay a public issue and a private email, with the secret', async () => {
+    const fetchFn = relayReturning({ ok: true, issue: 12, url: 'https://github.com/BPMData/AllHail/issues/12' });
     const post = await start(configured(fetchFn));
     const response = await post(goodReport);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, issueUrl: 'https://github.com/BPMData/allhail/issues/12' });
+    expect(await response.json()).toEqual({ ok: true, issueUrl: 'https://github.com/BPMData/AllHail/issues/12' });
 
     expect(fetchFn).toHaveBeenCalledOnce();
     const [url, init] = fetchFn.mock.calls[0];
     expect(url).toBe('https://script.google.com/macros/s/test/exec');
+    expect(init?.redirect).toBe('follow');
     const sent = JSON.parse(String(init?.body));
-    expect(sent.secret).toBe('shh');
-    expect(sent.public.symptoms).toEqual(['nothing-read']);
-    expect(sent.public.diagnostics).toEqual({
-      appVersion: '0.1.0',
-      os: 'Android 15',
-      browser: 'Chrome 131',
-      speaking: false,
-    });
-    expect(sent.private.email).toBe('teacher@example.org');
-    expect(sent).not.toHaveProperty('website');
+    expect(Object.keys(sent).sort()).toEqual(['app', 'email', 'issue', 'kind', 'token']);
+    expect(sent).toMatchObject({ app: 'AllHail', kind: 'problem-report', token: 'shh' });
+    expect(sent.issue.labels).toEqual(['problem-report']);
+    expect(sent.issue.title).toBe('Problem report: Speech, voices or MP3 · Android 15 · Chrome 131');
+    expect(sent.issue.body).toContain('nothing-read');
+    expect(sent.issue.body).not.toContain('not-a-real-symptom');
+    expect(sent.issue.body).not.toContain('photoData');
+    // The person's words and address stay out of the public issue...
+    expect(JSON.stringify(sent.issue)).not.toContain('Rivera');
+    expect(JSON.stringify(sent.issue)).not.toContain('teacher@example.org');
+    // ...and go only to the private email, which can be answered with Reply.
+    expect(sent.email.subject).toBe('[AllHail] Problem report: Speech, voices or MP3 · Android 15 · Chrome 131');
+    expect(sent.email.body).toContain("Ms. Rivera's worksheet");
+    expect(sent.email.replyTo).toBe('teacher@example.org');
+    expect(JSON.stringify(sent)).not.toContain('website');
   });
 
   it('never hands the browser a link outside this repository', async () => {

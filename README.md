@@ -51,7 +51,9 @@ Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/dep
 
 - The workflow logs in to Google Cloud with Workload Identity Federation: GitHub gives the job a short-lived token, and Google accepts it only from this repository's `main` branch (provider `allhail` in the `github` pool, acting as `github-deployer`). No key is stored in GitHub.
 - Before uploading, `scripts/check-upload.sh` stops the deploy if a `gha-creds-*.json` credentials file would be uploaded or `package-lock.json` would be missing. After deploying, `scripts/check-deploy.sh` checks for a new ready revision labelled with the commit and that the live address answers.
-- `OPENROUTER_API_KEY`, `REPORT_RELAY_URL` and `REPORT_RELAY_SECRET` are set on the Cloud Run service itself (the report ones are explained in [docs/REPORTS.md](docs/REPORTS.md)). The deploy sets only `NODE_ENV=production` and leaves the other service variables alone, so they don't need setting again.
+- The service runs as its own account, `allhail-run`, which can read only AllHail's own secrets.
+- `REPORT_RELAY_URL` and `REPORT_RELAY_SECRET` (for problem reports, see [docs/REPORTS.md](docs/REPORTS.md)) come from Secret Manager: every deploy attaches `allhail-report-relay-url` and `allhail-report-relay-secret` with `--set-secrets`. Nothing is pasted into the Cloud Run console.
+- `OPENROUTER_API_KEY` is set on the Cloud Run service itself. The deploy sets only `NODE_ENV=production` besides the secrets above and leaves the other service variables alone, so they don't need setting again.
 - The deploy keeps `--max-instances 1`. The rate limit is kept in memory, so more instances would multiply how much of the key one person can use.
 - `https://bpmdata.github.io/allhail` is a short link that redirects to the service's Cloud Run URL. The redirect isn't in this repo. Because the browser ends up on the Cloud Run address, the installed app, its offline files and its history all belong to that address, not to github.io.
 
@@ -107,7 +109,7 @@ For a student who is blind or has low vision, a teacher or aide can turn on simp
 - `src/historyStore.ts`: IndexedDB history.
 - `src/speech/`: the on-device speech pipeline: Kokoro, Piper, device voices, the coordinator that picks a voice, and MP3 export.
 - `server/describe.ts`: photo description endpoint with model fallback chains.
-- `src/components/ReportView.tsx`, `shared/report.ts`, `server/report.ts` and `tools/report-relay.gs`: the "Something not working?" problem report. Setup is in [docs/REPORTS.md](docs/REPORTS.md).
+- `src/components/ReportView.tsx`, `shared/report.ts`, `server/report.ts` and `server/reportMessage.ts`: the "Something not working?" problem report. Setup is in [docs/REPORTS.md](docs/REPORTS.md).
 - `server/visionConfig.ts`: the model chains for each button, timeouts and rate limits.
 - `shared/prompts.ts`: the v5 description prompts.
 - `shared/speechCleaner.ts`: tidies text for the voice (fractions to words, no markdown).
