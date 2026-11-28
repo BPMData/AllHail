@@ -2,12 +2,15 @@ import type { Request, Response } from 'express';
 import { sanitizeReport } from '../shared/report.ts';
 import { strings } from '../shared/strings.ts';
 import { createRateLimiter, type RateLimiter } from './rateLimit.ts';
+import { buildRelayMessage } from './reportMessage.ts';
 
 /**
- * POST /api/report: checks a "Something not working?" report and passes it to the reports relay
- * (tools/report-relay.gs, a Google Apps Script under the shared reports Gmail account). The relay
- * opens the public GitHub issue and emails the full report. The GitHub token lives only in the
- * relay; this server only knows the relay's address and a shared secret, both from env vars.
+ * POST /api/report: checks a "Something not working?" report, writes the public issue and the
+ * private email (reportMessage.ts), and passes both to the shared reports relay: OverBoard's
+ * Google Apps Script (BPMData/OverBoard, tools/report-relay.gs) under the shared reports Gmail
+ * account. The relay opens the issue and sends the email. The GitHub token lives only in the
+ * relay; this server only knows the relay's address and a shared secret (REPORT_RELAY_URL and
+ * REPORT_RELAY_SECRET, attached from Secret Manager by the deploy).
  * The private part of a report (comments, email) is never logged here.
  */
 
@@ -62,7 +65,7 @@ export function createReportHandler(deps: ReportDeps = {}) {
       return res.status(503).json({ error: 'reports_unavailable', message: strings.errReportUnavailable });
     }
 
-    const { website: _website, ...forward } = report;
+    const message = buildRelayMessage(report, secret);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -70,7 +73,7 @@ export function createReportHandler(deps: ReportDeps = {}) {
       const response = await fetchFn(relayUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ...forward, secret }),
+        body: JSON.stringify(message),
         redirect: 'follow',
         signal: controller.signal,
       });
